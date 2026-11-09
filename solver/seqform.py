@@ -874,5 +874,67 @@ class ProxIPMPDAS(ProxIPMNewton):
             self.log.append((k, used, ni, res, rk))
             hist.append((k, newton, r, self.sf.T.exploitability(self.to_sigma(z, sigma)) if track else None))
             if verbose:
-                print(hist[-1], used, ni, f'rho={rk:.0e}', f'{self.clock[-1]:.1f}s', flush=True)
+                print(hist[-1], used, ni, f'rho={float(np.min(rk)):.0e}', f'{self.clock[-1]:.1f}s', flush=True)
         return self.to_sigma(z, sigma), z, hist
+
+
+class ProxAAPDAS(ProxIPMPDAS):
+    """Anderson-accelerated proximal point.  The proximal map G(c) = argsol VI(M + rho I, b - rho c) is firmly
+    nonexpansive, and once the active set has settled it is AFFINE in c; Anderson acceleration of an affine fixed-point
+    iteration is essentially GMRES (Walker & Ni 2011).  So a LARGE, well-conditioned rho (cheap, reliable active-set
+    steps) can be combined with a fast outer loop.  G is evaluated by active-set Newton steps warm-started at the previous
+    evaluation; an interior-point solve is used only for the first evaluation or as a fallback."""
+    mem = 10
+    reg = 1e-12
+    restart_ratio = 4.0
+
+    def solve(self, sigma, rho=1e-3, outer=100, tol=1e-13, z0=None, track=True, inner_iters=50, verbose=False):
+        import time as _time
+        t0 = _time.time()
+        z = self.warm_start(sigma) if z0 is None else z0.copy()
+        r = np.linalg.norm(self.residual(z))
+        self.clock = [_time.time() - t0]
+        hist = [(0, 0, r, self.sf.T.exploitability(self.to_sigma(z, sigma)) if track else None)]
+        self.log = []; self.ipm_iters = 0
+        solves = 0
+        C, Gs = [], []                      # history of centres and their images
+        c = z.copy(); g_prev = z.copy()
+        for k in range(1, outer + 1):
+            t1 = _time.time()
+            gz, ni, ok, res = (None, 0, False, np.inf) if k == 1 else self.pdas(c, rho, g_prev.copy())
+            used = 'pdas'
+            if not ok:
+                zi, nip = self.ipm(c, rho, g_prev.copy())
+                self.ipm_iters += nip
+                gz, ni2, ok, res = self.pdas(c, rho, zi)
+                ni = ni + nip + ni2; used = 'ipm+pdas'
+                if not ok and self._subres(c, rho, zi) < res:
+                    gz, res, used = zi, self._subres(c, rho, zi), 'ipm'
+            solves += ni
+            g_prev = gz
+            f = gz - c
+            # restart the Anderson history if the residual blew up
+            if Gs and np.linalg.norm(f) > self.restart_ratio * np.linalg.norm(Gs[-1] - C[-1]):
+                C, Gs = [], []
+            C.append(c.copy()); Gs.append(gz.copy())
+            C, Gs = C[-(self.mem + 1):], Gs[-(self.mem + 1):]
+            if len(C) > 1:
+                F = np.array([g - cc for g, cc in zip(Gs, C)])            # residuals, (m+1) x N
+                dF = np.diff(F, axis=0)
+                H = dF @ dF.T
+                H += self.reg * (np.trace(H) + 1e-300) * np.eye(len(H))
+                gamma = np.linalg.solve(H, dF @ F[-1])
+                dG = np.diff(np.array(Gs), axis=0)
+                c = Gs[-1] - gamma @ dG
+            else:
+                c = gz.copy()
+            r = np.linalg.norm(self.residual(gz))
+            self.clock.append(self.clock[-1] + _time.time() - t1)
+            self.log.append((k, used, ni, res, rho))
+            hist.append((k, solves, r, self.sf.T.exploitability(self.to_sigma(gz, sigma)) if track else None))
+            if verbose:
+                print(hist[-1], used, ni, f'{self.clock[-1]:.1f}s', flush=True)
+            if r < tol:
+                break
+        self.z_final = gz
+        return self.to_sigma(gz, sigma), gz, hist

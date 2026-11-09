@@ -80,6 +80,7 @@ solver/
   aa.py, maps.py  Anderson acceleration of the CFR+ map (negative result)
   extrap.py       reduced-rank extrapolation of CFR averages (negative result)
   demo.py         two-second live demo (small river spot)
+  test_solver.py  sanity tests: hand evaluator, ranges, Kuhn value -1/18, finish = LP value on Leduc and a river spot
   bench_*.py      benchmarks -> results/*.json
   fig_*.py        figures    -> figs/*.pdf
   gen_numbers.py  results -> tex/numbers.tex (every computed number quoted on the slides)
@@ -93,6 +94,7 @@ tex/              talk.tex, talk.pdf, talk-notes.pdf
 ```bash
 pip install numpy scipy matplotlib qdldl
 cd solver
+python3 test_solver.py                                 # ~10 s
 python3 bench_baselines.py leduc 5000                  # CFR, CFR+, DCFR, PCFR+ on Leduc
 python3 bench_baselines.py leduc 50000 cfr+,dcfr _long
 python3 bench_river.py small 30000                     # baselines on the small river spot
