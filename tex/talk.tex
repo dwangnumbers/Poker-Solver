@@ -970,8 +970,9 @@ Starting from 1{,}000 instead of 3{,}000 DCFR iterations gives $\SuppMedOneKExpl
 % =====================================================================================
 \begin{frame}{\tagO\ Where it stops winning: full ranges, and open problems}
 \begin{block}{We computed: full 1{,}081-combo ranges for both players (47{,}568 unknowns, $A$: 22.4 M nonzeros)}
-\small Restricted problem 43\% of the unknowns, one factorisation $\approx$10\,s. Verification round 1 alone: 201 linear solves,
-\alert{50 min}, and 24 actions to add back. DCFR in 10 min: $9.5\times10^{-6}$. \textbf{Here CFR wins.}
+\small Restricted problem 43\% of the unknowns, one factorisation $\approx$10\,s. Two verification rounds: 317 linear solves,
+\alert{80 min}, exploitability $4.1\times10^{-6}$ (round 2 stalled at residual $5\times10^{-7}$). DCFR in 10 min: $9.5\times10^{-6}$.
+\textbf{Here CFR wins.}
 \end{block}
 \begin{itemize}\small\setlength\itemsep{4pt}
 \item \textbf{Structured linear algebra.} Each payoff block is semiseparable $+$ sparse (slide on vectorised CFR):
@@ -983,8 +984,9 @@ Starting from 1{,}000 instead of 3{,}000 DCFR iterations gives $\SuppMedOneKExpl
 \note{
 The full-range run is the honest boundary of the method as implemented. Restriction still removes more than half of the
 unknowns, but each factorisation of the remaining 20{,}000-unknown system takes about 10 seconds because the payoff blocks between
-the hands that remain in play are dense, and the first round needed 201 solves (the interior-point phase plus the proximal steps).
-DCFR does 40{,}000 iterations in the time of one round.\\[3pt]
+the hands that remain in play are dense; the first round needed 201 solves (50 minutes) and the second 116, and the second did not
+reach machine precision (the proximal loop stalled at residual $5\times10^{-7}$, final exploitability $4.1\times10^{-6}$).
+DCFR does 40{,}000 iterations, to $9.5\times10^{-6}$, in 10 minutes.\\[3pt]
 The research directions are the natural ones for this club. The first is the one I would bet on: the poker-specific structure that
 makes CFR fast (sorting, prefix sums, card-removal corrections) is exactly the structure a fast direct or preconditioned iterative
 solver for the Newton systems would need.
