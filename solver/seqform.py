@@ -364,6 +364,10 @@ class ProxNewton:
         self.nb = n0 + n1                       # bounded (nonnegative) coordinates come first
         self.I = sp.identity(self.N, format='csr')
 
+    def _rI(self, rho):
+        """rho * I, or diag(rho) for a vector of per-coordinate proximal weights."""
+        return sp.diags(np.broadcast_to(np.asarray(rho, float), (self.N,)).copy())
+
     def residual(self, z):
         """Natural residual of the unregularised VI (= 0 iff equilibrium)."""
         w = self.M @ z + self.b
@@ -383,7 +387,7 @@ class ProxNewton:
 
     def inner(self, zk, rho, z, iters=50, tol=1e-14):
         """Semismooth Newton (PDAS) for the rho-regularised subproblem, started at z."""
-        Mr = (self.M + rho * self.I).tocsr()
+        Mr = (self.M + self._rI(rho)).tocsr()
         br = self.b - rho * zk
         nb = self.nb
         for it in range(iters):
@@ -459,7 +463,7 @@ class ProxNewtonFB(ProxNewton):
         return Phi, (Da @ self.I + Db @ Mr).tocsc()
 
     def inner(self, zk, rho, z, iters=50, tol=1e-14):
-        Mr = (self.M + rho * self.I).tocsr()
+        Mr = (self.M + self._rI(rho)).tocsr()
         br = self.b - rho * zk
         self.steps = getattr(self, 'steps', [])
         for it in range(iters):
@@ -489,7 +493,7 @@ class ProxNewtonFBReduced(ProxNewtonFB):
     drop = 1e-9
 
     def inner(self, zk, rho, z, iters=50, tol=1e-14):
-        Mr = (self.M + rho * self.I).tocsr()
+        Mr = (self.M + self._rI(rho)).tocsr()
         br = self.b - rho * zk
         nb, c, N = self.nb, self.c, self.N
         self.steps = getattr(self, 'steps', []); self.sizes = getattr(self, 'sizes', [])
@@ -527,3 +531,348 @@ class ProxNewtonFBReduced(ProxNewtonFB):
             z = zn
             self.steps.append(t)
         return z, it + 1
+
+
+class ProxNewtonQD(ProxNewtonFBReduced):
+    """ProxNewtonFBReduced with the Newton system solved in SYMMETRIC QUASI-DEFINITE form.
+    Dividing each (undecided) row by its FB weight D_b gives  (H + M + rho I) d = r  with H = D_a/D_b >= 0 diagonal and
+    M skew.  Flipping the signs of the y- and p-rows makes it symmetric:
+        [ H_x  -A    E^T   0  ]
+        [ -A^T -H_y  0     F^T]        positive block (x, q), negative block (y, p):
+        [ E    0    -H_p   0  ]        quasi-definite  =>  LDL^T exists for EVERY symmetric ordering
+        [ 0    F     0    H_q ]        (Vanderbei 1995), so a fill-reducing AMD ordering can be used freely.
+    Factorisation: QDLDL (AMD + sparse LDL^T); two steps of iterative refinement."""
+    refine = 2
+
+    def inner(self, zk, rho, z, iters=50, tol=1e-14):
+        import qdldl
+        Mr = (self.M + self._rI(rho)).tocsr()
+        br = self.b - rho * zk
+        nb, c, N = self.nb, self.c, self.N
+        sgn = np.ones(N); sgn[self.n0:self.nb] = -1; sgn[self.nb:self.nb + self.m0] = -1
+        self.steps = getattr(self, 'steps', []); self.sizes = getattr(self, 'sizes', [])
+        for it in range(iters):
+            w = Mr @ z + br
+            a, b = z[:nb], c * w[:nb]
+            r = np.sqrt(a * a + b * b)
+            Phi = np.concatenate([a + b - r, w[nb:]])
+            th = 0.5 * Phi @ Phi
+            self.inner_res = getattr(self, 'inner_res', []); self.inner_res.append(float(np.sqrt(2 * th)))
+            if np.sqrt(2 * th) < tol:
+                break
+            rz = r == 0; rs = np.where(rz, 1.0, r)
+            da = np.where(rz, 1 - 1 / np.sqrt(2), 1 - a / rs)
+            db = np.where(rz, 1 - 1 / np.sqrt(2), 1 - b / rs)
+            da = np.concatenate([da, np.zeros(N - nb)]); db = np.concatenate([c * db, np.ones(N - nb)])
+            Aset = db < self.drop
+            Fset = ~Aset
+            d = np.zeros(N)
+            d[Aset] = -Phi[Aset] / da[Aset]
+            MF = Mr[Fset]
+            rhs = (-Phi[Fset] - db[Fset] * (MF[:, Aset] @ d[Aset])) / db[Fset]
+            K = (sp.diags(da[Fset] / db[Fset]) + MF[:, Fset]).tocsr()
+            s = sgn[Fset]
+            Ks = (sp.diags(s) @ K).tocsc()
+            fac = qdldl.Solver(sp.triu(Ks, format='csc'), upper=True)
+            bs = s * rhs
+            dF = fac.solve(bs)
+            for _ in range(self.refine):
+                dF += fac.solve(bs - Ks @ dF)
+            d[Fset] = dF
+            self.sizes.append(int(Fset.sum()))
+            t = 1.0
+            while t > 1e-10:
+                zn = z + t * d; wn = Mr @ zn + br
+                an, bn = zn[:nb], c * wn[:nb]
+                Pn = np.concatenate([an + bn - np.sqrt(an * an + bn * bn), wn[nb:]])
+                if 0.5 * Pn @ Pn <= (1 - 2e-4 * t) * th:
+                    break
+                t *= 0.5
+            z = zn
+            self.steps.append(t)
+        return z, it + 1
+
+
+def fb_scaling(sf):
+    """Per-sequence weight c_i for the FB pairs (x_i, c_i w_i).  The slack w_i of sequence (I, h, a) carries the factor
+    r_p(h) * m_p(h) / Z  (own range weight times compatible opponent mass, over the deal weight), times a payoff in
+    chips.  Dividing it out (and by the payoff scale) makes c_i w_i a dimensionless counterfactual regret, comparable
+    with the probability x_i."""
+    g = sf.g
+    C = g.bases['norm']
+    r0, r1 = g.root_reach
+    mass = [C @ r1, C.T @ r0]
+    scale = max(abs(getattr(n, 'amount', 0.0)) for n in _leaves(g.root)) or 1.0
+    out = []
+    for p in (0, 1):
+        c = np.ones(sf.nseq[p])
+        for ni in sf.infosets[p]:
+            n = g.decisions[ni]; na = len(n.actions); base = sf.seq_index[p][ni]
+            w = g.root_reach[p] * mass[p] / g.Z * scale
+            c[base:base + g.nh[p] * na] = np.repeat(1.0 / np.maximum(w, 1e-300), na)
+        out.append(c)
+    return np.concatenate(out)
+
+
+def _leaves(node):
+    if node.kind in ('fold', 'showdown'):
+        yield node
+    for c in node.children:
+        yield from _leaves(c)
+
+
+class ProxSmoothNewtonQD(ProxNewtonQD):
+    """As ProxNewtonQD, but each subproblem is solved by a SMOOTHING Newton method: the Fischer-Burmeister function
+    is replaced by  phi_mu(a, b) = a + b - sqrt(a^2 + b^2 + 2 mu^2)  (Kanzow 1996), with mu driven to zero together with
+    the residual (mu = min(mu, theta * ||Phi_0||)).  The smoothing removes the kink at a = b = 0, which is where
+    near-degenerate pairs (tiny probability, tiny regret) make the plain FB-Newton line search take tiny steps."""
+    theta = 0.1
+
+    def inner(self, zk, rho, z, iters=50, tol=1e-14):
+        import qdldl
+        Mr = (self.M + self._rI(rho)).tocsr()
+        br = self.b - rho * zk
+        nb, c, N = self.nb, self.c, self.N
+        sgn = np.ones(N); sgn[self.n0:self.nb] = -1; sgn[self.nb:self.nb + self.m0] = -1
+        self.steps = getattr(self, 'steps', []); self.sizes = getattr(self, 'sizes', [])
+        self.inner_res = getattr(self, 'inner_res', [])
+
+        def phis(z, mu):
+            w = Mr @ z + br
+            a, b = z[:nb], c * w[:nb]
+            r = np.sqrt(a * a + b * b + 2 * mu * mu)
+            return np.concatenate([a + b - r, w[nb:]]), a, b, r
+
+        mu = np.inf
+        for it in range(iters):
+            P0 = phis(z, 0.0)[0]
+            res = float(np.linalg.norm(P0)); self.inner_res.append(res)
+            if res < tol:
+                break
+            mu = min(mu, self.theta * res / np.sqrt(N))
+            Phi, a, b, r = phis(z, mu)
+            th = 0.5 * Phi @ Phi
+            rs = np.where(r == 0, 1.0, r)
+            da = np.where(r == 0, 1 - 1 / np.sqrt(2), 1 - a / rs)
+            db = np.where(r == 0, 1 - 1 / np.sqrt(2), 1 - b / rs)
+            da = np.concatenate([da, np.zeros(N - nb)]); db = np.concatenate([c * db, np.ones(N - nb)])
+            Aset = db < self.drop
+            Fset = ~Aset
+            d = np.zeros(N)
+            d[Aset] = -Phi[Aset] / da[Aset]
+            MF = Mr[Fset]
+            rhs = (-Phi[Fset] - db[Fset] * (MF[:, Aset] @ d[Aset])) / db[Fset]
+            K = (sp.diags(da[Fset] / db[Fset]) + MF[:, Fset]).tocsr()
+            s = sgn[Fset]
+            Ks = (sp.diags(s) @ K).tocsc()
+            fac = qdldl.Solver(sp.triu(Ks, format='csc'), upper=True)
+            bs = s * rhs
+            dF = fac.solve(bs)
+            for _ in range(self.refine):
+                dF += fac.solve(bs - Ks @ dF)
+            d[Fset] = dF
+            self.sizes.append(int(Fset.sum()))
+            t = 1.0
+            while t > 1e-10:
+                Pn = phis(z + t * d, mu)[0]
+                if 0.5 * Pn @ Pn <= (1 - 2e-4 * t) * th:
+                    break
+                t *= 0.5
+            z = z + t * d
+            self.steps.append(t)
+        return z, it + 1
+
+
+def purify(sigma, tau=1e-3, R=None):
+    """Warm-start purification.  CFR averages put O(1/T) mass on actions that are not in the equilibrium support; the
+    Newton linearisation then demands indifference for all of them and produces huge, useless steps.  Drop actions with
+    average probability below tau (or, if regrets R are given, with nonpositive cumulative regret), renormalise."""
+    out = []
+    for i, s in enumerate(sigma):
+        keep = s > tau
+        if R is not None:
+            keep = keep & (R[i] > 0) | (s >= s.max(axis=1, keepdims=True))
+        t = np.where(keep, s, 0.0)
+        tot = t.sum(axis=1, keepdims=True)
+        out.append(np.where(tot > 0, t / np.where(tot > 0, tot, 1), s))
+    return out
+
+
+class ProxIPMNewton(ProxNewtonQD):
+    """Hybrid finish for large spots.  The first proximal subproblem (where most of the active-set changes happen) is
+    solved by a Mehrotra predictor-corrector INTERIOR-POINT method, whose iteration count is insensitive to how many
+    pairs change status; the later subproblems start with the right active set and use Fischer-Burmeister semismooth
+    Newton (finite termination).  Both Newton systems have the form (D + M + rho I) d = r with D >= 0 diagonal, so both
+    use the same quasi-definite LDL^T solver."""
+    ipm_tol = 1e-9
+    ipm_shift = 1e-3
+    ipm_outers = 1
+
+    def _qd_solve(self, D, Mr, rhs, sgn):
+        import qdldl
+        K = (sp.diags(D) + Mr).tocsr()
+        Ks = (sp.diags(sgn) @ K).tocsc()
+        fac = qdldl.Solver(sp.triu(Ks, format='csc'), upper=True)
+        def solve(r):
+            b = sgn * r
+            d = fac.solve(b)
+            for _ in range(self.refine):
+                d += fac.solve(b - Ks @ d)
+            return d
+        return solve
+
+    def ipm(self, zk, rho, z, iters=60):
+        Mr = (self.M + self._rI(rho)).tocsr()
+        br = self.b - rho * zk
+        nb, N = self.nb, self.N
+        sgn = np.ones(N); sgn[self.n0:self.nb] = -1; sgn[self.nb:self.nb + self.m0] = -1
+        z = z.copy()
+        w = Mr @ z + br
+        u = np.maximum(z[:nb], 0) + self.ipm_shift
+        s = np.maximum(w[:nb], 0) + self.ipm_shift
+        z[:nb] = u
+        self.ipm_hist = []
+        for it in range(iters):
+            w = Mr @ z + br
+            rs = s - w[:nb]; rf = w[nb:]
+            mu = u @ s / nb
+            res = max(np.linalg.norm(rs, np.inf), np.linalg.norm(rf, np.inf), mu)
+            self.ipm_hist.append((it, float(mu), float(np.linalg.norm(rs)), float(np.linalg.norm(rf))))
+            if res < self.ipm_tol:
+                it -= 1
+                break
+            D = np.concatenate([s / u, np.zeros(N - nb)])
+            solve = self._qd_solve(D, Mr, None, sgn)
+
+            def direction(rc):
+                # rc = target for u*s (componentwise): S du + U ds = rc - u s
+                rhs = np.concatenate([(rc - u * s) / u + rs, -rf])
+                dz = solve(rhs)
+                ds = -rs + (Mr @ dz)[:nb]
+                return dz, ds
+
+            def maxstep(v, dv):
+                neg = dv < 0
+                return min(1.0, float(np.min(-v[neg] / dv[neg]))) if neg.any() else 1.0
+
+            dz_a, ds_a = direction(np.zeros(nb))
+            du_a = dz_a[:nb]
+            a_a = min(maxstep(u, du_a), maxstep(s, ds_a))
+            mu_a = (u + a_a * du_a) @ (s + a_a * ds_a) / nb
+            sigma = (mu_a / mu) ** 3
+            dz, ds = direction(sigma * mu - du_a * ds_a)
+            du = dz[:nb]
+            a = 0.99 * min(maxstep(u, du), maxstep(s, ds))
+            z = z + a * dz; s = s + a * ds; u = z[:nb]
+            if getattr(self, 'trace', None) is not None:
+                self.trace.append(('ipm', float(np.linalg.norm(self.residual(z)))))
+        self.ipm_last = it + 1                      # number of linear-system factorisations
+        return z, it + 1
+
+    def solve(self, sigma, rho=1e-5, outer=50, tol=1e-13, z0=None, track=True, inner_iters=50, verbose=False):
+        import time as _time
+        t0 = _time.time()
+        z = self.warm_start(sigma) if z0 is None else z0.copy()
+        r = np.linalg.norm(self.residual(z))
+        self.clock = [_time.time() - t0]
+        hist = [(0, 0, r, self.sf.T.exploitability(self.to_sigma(z, sigma)) if track else None)]
+        newton = 0
+        for k in range(1, outer + 1):
+            if r < tol:
+                break
+            t1 = _time.time()
+            if k <= self.ipm_outers:
+                z, ni = self.ipm(z.copy(), rho, z.copy())
+            else:
+                z, ni = self.inner(z.copy(), rho, z.copy(), iters=inner_iters)
+            newton += ni
+            r = np.linalg.norm(self.residual(z))
+            self.clock.append(self.clock[-1] + _time.time() - t1)
+            hist.append((k, newton, r, self.sf.T.exploitability(self.to_sigma(z, sigma)) if track else None))
+            if verbose:
+                print(hist[-1], f'{self.clock[-1]:.1f}s', flush=True)
+        return self.to_sigma(z, sigma), z, hist
+
+
+class ProxIPMPDAS(ProxIPMNewton):
+    """Proximal point outer loop; each strongly monotone subproblem solved by
+         (i)  primal-dual active-set (PDAS) steps -- semismooth Newton on min(x, w) with full steps -- started from the
+              previous prox solution (successive prox solutions share their active set, so 1-2 steps usually suffice);
+         (ii) if PDAS does not terminate, a Mehrotra interior-point solve, followed by PDAS from the IPM point
+              ('crossover': the IPM point predicts the active set, one linear solve lands exactly on the solution).
+    Every linear system is (D + M + rho I) restricted to the free coordinates: symmetric quasi-definite after sign flips."""
+    pdas_iters = 8
+    ipm_tol = 1e-8
+    pdas_solver = 'lu'
+
+    def _subres(self, zk, rho, z):
+        w = (self.M + self._rI(rho)) @ z + self.b - rho * zk
+        w[:self.nb] = np.minimum(z[:self.nb], w[:self.nb])
+        return float(np.linalg.norm(w))
+
+    def pdas(self, zk, rho, z, iters=None):
+        iters = iters or self.pdas_iters
+        Mr = (self.M + self._rI(rho)).tocsr()
+        br = self.b - rho * zk
+        nb, N = self.nb, self.N
+        sgn = np.ones(N); sgn[self.n0:self.nb] = -1; sgn[self.nb:self.nb + self.m0] = -1
+        prev = None
+        for it in range(iters):
+            w = Mr @ z + br
+            act = np.zeros(N, bool); act[:nb] = z[:nb] <= w[:nb]
+            psi = w.copy(); psi[act] = z[act]
+            res = float(np.linalg.norm(psi))
+            if res < 1e-13 or (prev is not None and np.array_equal(act, prev) and res < 1e-11):
+                return z, it, True, res
+            prev = act
+            F = ~act
+            MF = Mr[F][:, F].tocsc()
+            zn = np.zeros(N)
+            if self.pdas_solver == 'lu':          # pivoted LU: the PDAS matrix (diag = +-rho) is too ill-conditioned for LDL^T
+                zn[F] = spla.spsolve(MF, -br[F])
+            else:
+                solve = self._qd_solve(np.zeros(int(F.sum())), MF, None, sgn[F])
+                zn[F] = solve(-br[F])
+            self.pdas_linres = float(np.linalg.norm(MF @ zn[F] + br[F]) / max(np.linalg.norm(br[F]), 1e-300))
+            z = zn
+            if getattr(self, 'trace', None) is not None:
+                self.trace.append(('pdas', float(np.linalg.norm(self.residual(z)))))
+        w = Mr @ z + br
+        psi = w.copy(); psi[:nb] = np.minimum(z[:nb], w[:nb])
+        res = float(np.linalg.norm(psi))
+        return z, iters, res < 1e-11, res
+
+    def solve(self, sigma, rho=1e-5, outer=50, tol=1e-13, z0=None, track=True, inner_iters=50, verbose=False):
+        import time as _time
+        t0 = _time.time()
+        z = self.warm_start(sigma) if z0 is None else z0.copy()
+        r = np.linalg.norm(self.residual(z))
+        self.clock = [_time.time() - t0]
+        hist = [(0, 0, r, self.sf.T.exploitability(self.to_sigma(z, sigma)) if track else None)]
+        self.log = []
+        newton = 0
+        self.ipm_iters = 0
+        for k in range(1, outer + 1):
+            if r < tol:
+                break
+            t1 = _time.time()
+            zk = z.copy()
+            rk = rho(k) if callable(rho) else rho
+            zt, ni, ok, res = (z, 0, False, np.inf) if k == 1 else self.pdas(zk, rk, z.copy())
+            used = 'pdas'
+            if not ok:
+                zi, nip = self.ipm(zk, rk, z.copy())
+                self.ipm_iters += nip
+                zt, ni2, ok, res = self.pdas(zk, rk, zi)
+                ni = ni + nip + ni2; used = 'ipm+pdas'
+                if not ok and self._subres(zk, rk, zi) < res:     # crossover failed: keep the interior point
+                    zt, res, used = zi, self._subres(zk, rk, zi), 'ipm'
+            z = zt
+            newton += ni
+            r = np.linalg.norm(self.residual(z))
+            self.clock.append(self.clock[-1] + _time.time() - t1)
+            self.log.append((k, used, ni, res, rk))
+            hist.append((k, newton, r, self.sf.T.exploitability(self.to_sigma(z, sigma)) if track else None))
+            if verbose:
+                print(hist[-1], used, ni, f'rho={rk:.0e}', f'{self.clock[-1]:.1f}s', flush=True)
+        return self.to_sigma(z, sigma), z, hist

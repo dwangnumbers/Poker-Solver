@@ -66,8 +66,8 @@
   \tikz[baseline=-0.7ex]{\node[draw=ink2,fill=white,rounded corners=2.5pt,minimum width=#1*0.62cm,
   minimum height=#1*0.86cm,inner sep=0pt,text=suit-#3,font=\bfseries\sffamily]
   {\shortstack{#2\\[-1pt]\suitsym{#3}}};}}
-\newcommand{\cardback}{\tikz[baseline=-0.7ex]{\node[draw=ink2,fill=cblue!70,rounded corners=2.5pt,
-  minimum width=0.62cm,minimum height=0.86cm]{};}}
+\newcommand{\cardback}{\tikz[baseline=-0.7ex]{\node[draw=white,fill=suitred!80!black,rounded corners=2pt,
+  minimum width=0.42cm,minimum height=0.6cm,inner sep=0pt]{};}}
 
 \title{Solving Poker}
 \subtitle{The numerical analysis behind poker solvers\\ --- and a second-order finish for them}
@@ -163,13 +163,13 @@ one --- with honest results: where it wins by orders of magnitude, and where it 
 \column{0.48\textwidth}
 \centering
 \begin{tikzpicture}
-  \fill[felt,rounded corners=30pt] (-3,-1.7) rectangle (3,1.7);
-  \node at (0,0.25) {\pcard{K}{s}\,\pcard{7}{d}\,\pcard{2}{c}\,\pcard{T}{h}\,\pcard{4}{s}};
-  \node[text=white,font=\small] at (0,-0.55) {pot $= 100$, stacks $= 100$};
-  \node at (-1.9,-1.25) {\cardback\,\cardback};
-  \node at (1.9,-1.25) {\cardback\,\cardback};
-  \node[text=white,font=\scriptsize] at (-1.9,1.25) {Big blind (OOP)};
-  \node[text=white,font=\scriptsize] at (1.9,1.25) {Button (IP)};
+  \fill[felt,rounded corners=28pt] (-3.2,-1.9) rectangle (3.2,1.9);
+  \node at (0,0.55) {\pcard{K}{s}\,\pcard{7}{d}\,\pcard{2}{c}\,\pcard{T}{h}\,\pcard{4}{s}};
+  \node[text=white,font=\small] at (0,-0.25) {pot $= 100$, stacks $= 100$};
+  \node at (-1.7,-1.0) {\cardback\,\cardback};
+  \node at (1.7,-1.0) {\cardback\,\cardback};
+  \node[text=white,font=\scriptsize] at (-1.7,-1.6) {Big blind (OOP)};
+  \node[text=white,font=\scriptsize] at (1.7,-1.6) {Button (IP)};
 \end{tikzpicture}\\[4pt]
 {\small Our running example: the \alert{river}, last betting round.\\
 The big blind acts first (``out of position'').}
@@ -374,19 +374,22 @@ On the smaller test spots the LP is perfectly fine (Leduc: 0.04\,s, small river:
 
 % =====================================================================================
 \begin{frame}{\tagM\ Regret matching (Hart \& Mas-Colell 2000)}
-Repeated decision with actions $A$, payoffs $u_t(a)$ revealed after each round.
-\[ R_T(a) = \sum_{t=1}^T \big(u_t(a) - u_t(\sigma_t)\big),\qquad
-   \sigma_{T+1}(a) = \frac{[R_T(a)]^+}{\sum_b [R_T(b)]^+}\quad(\text{uniform if all } \le 0). \]
+\begin{columns}[T]
+\column{0.62\textwidth}
+Repeated decision, actions $A$, payoffs $u_t(a)$ revealed each round. No step size, no tuning:
+\[ R_T(a) = \sum_{t=1}^T \big(u_t(a) - u_t(\sigma_t)\big),\quad
+   \sigma_{T+1}(a) = \frac{[R_T(a)]^+}{\sum_b [R_T(b)]^+}. \]
 \begin{block}{Blackwell approachability $\Rightarrow$ no regret}
 \[\max_a R_T(a)\ \le\ \Delta\sqrt{|A|\,T}\qquad(\Delta = \text{payoff range}).\]
 \end{block}
-\begin{block}{Self-play $\Rightarrow$ equilibrium (``folk theorem'')}
-If both players have average regret $\le \varepsilon$, the \emph{average} strategies $(\bar x_T,\bar y_T)$ are a $2\varepsilon$-equilibrium.
+\begin{block}{Self-play $\Rightarrow$ equilibrium}
+Average regrets $\le\varepsilon$ for both players $\Rightarrow$ the \emph{average} strategies are a $2\varepsilon$-equilibrium.
 \end{block}
-\begin{itemize}
-\item No step size, no projection, no tuning --- just ``play actions in proportion to how much you regret not playing them''.
-\item Rate $O(T^{-1/2})$ in theory; as a numerical method: a nonsmooth, parameter-free first-order iteration.
-\end{itemize}
+\column{0.36\textwidth}
+\centering
+\includegraphics[width=\linewidth]{rm_rps.pdf}\\
+{\scriptsize We computed: self-play on a weighted rock--paper--scissors. The iterate cycles; the average converges to $(\frac14,\frac12,\frac14)$.}
+\end{columns}
 \note{
 Proof idea of the bound: the regret vector $R_T$ satisfies $\|[R_{T}]^+\|^2 \le \|[R_{T-1}]^+\|^2 + \Delta^2|A|$ because the
 cross term $\langle [R_{T-1}]^+, r_T\rangle$ vanishes by the choice of $\sigma_T$ --- the instantaneous regret is orthogonal to the
@@ -530,17 +533,23 @@ showdown value) fails, and the solver tells you by how much.
 
 % =====================================================================================
 \begin{frame}{\tagM\ Why push precision further?}
+\begin{columns}[T]
+\column{0.58\textwidth}
 Practical solvers stop at $\approx 0.1$--$0.5\%$ of the pot. Reasons to want more:
-\begin{itemize}\setlength\itemsep{4pt}
-\item \textbf{Subgame re-solving} (DeepStack, Libratus) stitches many solves together; errors compound across streets.
-\item \textbf{Exact mixing frequencies and supports}: which hands \emph{exactly} mix? First-order methods only hint.
-\item \textbf{Certificates}: a primal--dual pair with residual $10^{-13}$ is a proof of (near-)optimality.
-\item \textbf{Research}: benchmarking algorithms needs ground truth.
+\begin{itemize}\small\setlength\itemsep{2pt}
+\item \textbf{Subgame re-solving} stitches many solves together; errors compound across streets.
+\item \textbf{Exact mixing frequencies and supports}: which hands \emph{exactly} mix?
+\item \textbf{Certificates}: a primal--dual pair with residual $10^{-13}$ proves near-optimality.
+\item \textbf{Research}: benchmarks need ground truth.
 \end{itemize}
-\vspace{6pt}
+\column{0.4\textwidth}
+\includegraphics[width=\linewidth]{avg_vs_last.pdf}\\
+{\scriptsize We computed (Leduc): only the average converges; the last iterate stalls.}
+\end{columns}
+\vspace{2pt}
 \begin{alertblock}{The numerical analyst's view}
 CFR is a first-order method on a nonsmooth, degenerate saddle-point problem: robust, cheap per step, \emph{sublinear} tail.
-The classical cure for a slow tail is a \emph{local, higher-order} method started from a good point.
+The classical cure for a slow tail: a \emph{local, higher-order} method started from a good point.
 \end{alertblock}
 \note{
 Make the case without overselling: for a human studying a spot, 0.3\% of the pot is plenty. Precision matters for
@@ -610,7 +619,7 @@ with signs so that $M^\top = -M$.
 \item $M+\rho I$ is positive definite ($d^\top(M+\rho I)d = \rho\|d\|^2$) $\Rightarrow$ \textbf{unique} solution of each subproblem.
 \item Converges to a solution of the original VI for any $\rho>0$.
 \item Polyhedral problem $\Rightarrow$ \textbf{linear} rate, factor $\to 0$ as $\rho \to 0$ (Luque 1984).
-\item Small $\rho$: fast outer loop, harder subproblems.
+\item Small $\rho$: fast outer loop, but ill-conditioned subproblems ($\|(M+\rho I)^{-1}\|\le 1/\rho$).
 \end{itemize}
 \column{0.45\textwidth}
 \begin{block}{We computed (Leduc, $\rho = 10^{-5}$)}
@@ -624,68 +633,132 @@ The proximal term fixes non-uniqueness: each subproblem has exactly one solution
 nonsingular target. For polyhedral monotone problems the inverse operator is upper Lipschitz (Robinson 1981), which gives linear
 convergence of the proximal point method with a factor that tends to zero as $\rho\to0$ (Luque 1984; Rockafellar 1976 for the
 general theory).\\[3pt]
-Table from our runs: at $\rho=10^{-3}$ Leduc needed 19 prox steps, at $10^{-4}$: 6, at $10^{-5}$: 4, at $10^{-6}$: 3. We use $\rho=10^{-5}$.
+The trade-off is the whole story of the last part of the talk: small $\rho$ makes the outer loop fast and the inner problems
+nearly as ill-posed as the original one.
 }
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ Inner loop: semismooth Newton on Fischer--Burmeister}
-Replace complementarity $0\le a\perp b\ge0$ by $\varphi(a,b) = a + b - \sqrt{a^2+b^2} = 0$ (Fischer 1992):
-\[ \Phi(z) = \big(\varphi(x_i, w_i)\big)_{\text{bounded}},\ \ \big(w_j\big)_{\text{free}} = 0,\qquad
-   V = D_a + D_b\,(M+\rho I)\ \in\ \partial\Phi(z), \]
-$D_a, D_b \ge 0$ diagonal with $(D_a)_{ii} + (D_b)_{ii} \ge 2-\sqrt2$.
-\begin{block}{Lemma. Every such $V$ is nonsingular.}
+\begin{frame}{\tagO\ Inner loop: semismooth Newton = primal--dual active set}
+Each subproblem is a piecewise-linear equation:
+\[ \Psi(z) = \Big(\min\big(x_i,\ w_\rho(z)_i\big)\Big)_{\text{bounded}},\ \ \big(w_\rho(z)_j\big)_{\text{free}} = 0. \]
+A generalised Jacobian row is $e_i^\top$ (``$x_i = 0$'', active) or a row of $M+\rho I$ (``indifferent'', inactive):
+$V = D_a + D_b(M+\rho I)$. The Newton step = fix the active set, solve one linear system (Hinterm\"uller--Ito--Kunisch 2002).
+\begin{block}{Lemma. Every $V = D_a + D_b(M+\rho I)$, $D_a,D_b\ge0$ diagonal, $D_a+D_b\succ0$, is nonsingular.}
 \small If $Vd=0$, put $u = (M+\rho I)d$. Row $i$: $(D_a)_{ii}d_i + (D_b)_{ii}u_i = 0$ with nonnegative, not both zero
 coefficients $\Rightarrow d_i u_i \le 0$. Hence $\rho\|d\|^2 = d^\top u = \sum_i d_i u_i \le 0$, so $d=0$. \hfill$\square$
 \end{block}
 \begin{itemize}\small
-\item $\theta = \tfrac12\|\Phi\|^2$ is $C^1$ $\Rightarrow$ Armijo line search; for strongly monotone problems every stationary point
-      of $\theta$ is the solution (De Luca--Facchinei--Kanzow 1996).
-\item Globally convergent, locally \textbf{quadratic} (strong semismoothness; Qi--Sun 1993).
+\item Right active set $\Rightarrow$ \textbf{exact} solution in one step (finite termination). Wrong one $\Rightarrow$ no global guarantee.
+\item The lemma also covers Fischer--Burmeister Newton (globalised by a line search), which we tried first: robust, but on larger
+      spots the line search crawls (steps $\sim10^{-3}$).
 \end{itemize}
 \note{
-Why Fischer--Burmeister rather than $\min(a,b)$: the min-function gives a Newton method (the primal--dual active-set method)
-whose merit function is nonsmooth, and on our river spot the line search on it stalled with steps of $10^{-4}$, while full steps
-diverged. FB has a continuously differentiable merit function, so standard globalisation works.\\[3pt]
-The lemma is the reason for the proximal term: without $\rho$, $d^\top M d = 0$ and the argument fails --- indeed Newton matrices
-of the unregularised problem are singular at degenerate solutions, which is exactly what we observed with Levenberg--Marquardt.
+The min-function reformulation turns complementarity into a piecewise-linear equation; semismooth Newton on it is exactly the
+primal--dual active-set method: guess which actions are dropped, impose indifference on the rest, solve. The lemma is the reason
+for the proximal term: without $\rho$, $d^\top M d = 0$ and the argument fails --- Newton matrices of the unregularised problem
+are singular at degenerate solutions, which is what we saw with Levenberg--Marquardt.\\[3pt]
+Fischer--Burmeister ($\varphi(a,b) = a+b-\sqrt{a^2+b^2}$) gives a $C^1$ merit function and a globally convergent damped Newton method
+(De Luca--Facchinei--Kanzow 1996). It worked on Leduc and the small river (about 50--70 linear solves) but on the medium spot it
+took steps of size $10^{-3}$ for dozens of iterations. That is what pushed us to the interior-point start on the next slide.
+}
+\end{frame}
+
+% =====================================================================================
+\begin{frame}{\tagO\ Globalisation: interior point, then crossover}
+\begin{columns}[T]
+\column{0.55\textwidth}
+\textbf{First} prox subproblem (most active-set changes):
+\begin{itemize}\small\setlength\itemsep{2pt}
+\item Mehrotra predictor--corrector \textbf{interior-point} method, started from the CFR point; its iteration count does not care how
+      many actions enter or leave the support.
+\item Its point predicts the active set ($x_i > s_i$) $\Rightarrow$ active-set Newton steps land \emph{exactly} on the
+      subproblem's solution: \textbf{crossover}, as in LP solvers.
+\end{itemize}
+\textbf{Later} subproblems: active-set Newton from the previous solution (successive prox points share their active set):
+1--3 linear solves each.
+\column{0.42\textwidth}
+\begin{block}{The hybrid solver}
+\small
+\begin{enumerate}\setlength\itemsep{2pt}
+\item DCFR, $k$ iterations $\to (\bar x,\bar y)$;
+\item one best-response pass $\to (p,q)$;
+\item prox step 1: IPM $+$ crossover;
+\item prox steps $2,3,\dots$: active-set Newton;
+\item stop at VI residual $10^{-13}$.
+\end{enumerate}
+$\rho = 10^{-5}$ throughout.
+\end{block}
+\end{columns}
+\note{
+The division of labour mirrors what commercial LP solvers do (interior point, then crossover to a vertex), but inside a proximal
+loop and with a game-theoretic warm start. In our runs the interior-point phase took 6--8 factorisations on Leduc and the small
+river, the crossover a few active-set steps, and every later proximal step 1--3 active-set steps.\\[3pt]
+If the crossover fails (the predicted active set is wrong and the residual grows), we keep the interior point and solve the
+next subproblem the same way --- this fallback is what happens on the medium spot.
+}
+\end{frame}
+
+% =====================================================================================
+\begin{frame}{\tagO\ The linear algebra: a quasi-definite system}
+Every Newton-type system is $(D + M + \rho I)\,d = r$, $D\ge0$ diagonal. Flip the signs of the $y$- and $p$-rows:
+\[
+K = \begin{pmatrix} D_x + \rho I & -A & E^\top & 0\\ -A^\top & -(D_y+\rho I) & 0 & F^\top\\ E & 0 & -\rho I & 0\\ 0 & F & 0 & \rho I \end{pmatrix}
+\quad\text{symmetric.}
+\]
+\begin{columns}[T]
+\column{0.53\textwidth}
+\begin{itemize}\small\setlength\itemsep{3pt}
+\item Grouping $(x,q)$, $(y,p)$: $\begin{psmallmatrix} P & B\\ B^\top & -N\end{psmallmatrix}$, $P,N\succ0$: \textbf{quasi-definite}.
+\item Vanderbei (1995): $LDL^\top$ for \emph{every} symmetric ordering $\Rightarrow$ AMD, no pivoting.
+\item IPM systems: $LDL^\top$ $+$ 2 refinements. Active-set systems ($\pm\rho$ diagonal): pivoted LU on the support.
+\end{itemize}
+\column{0.44\textwidth}
+\begin{block}{We computed: one factorisation}
+\small
+\begin{tabular}{@{}lcc@{}}
+& small river & medium river\\ \midrule
+unsymmetric LU & 0.11\,s & 25\,s\\
+quasi-def.\ $LDL^\top$ & 0.04\,s & 7.6\,s
+\end{tabular}\\[3pt]
+{\scriptsize SuperLU (COLAMD) vs QDLDL (AMD), one core.}
+\end{block}
+\end{columns}
+\note{
+This is the numerical-linear-algebra heart of the method. Row-scaled, the Newton matrix is ``positive diagonal plus skew'';
+flipping the signs of half the rows makes it symmetric, and the sign pattern of the diagonal is exactly that of a quasi-definite
+matrix. Vanderbei's theorem says every symmetric permutation has an $LDL^\top$ factorisation, so a fill-reducing ordering can be
+chosen before seeing the numbers --- the same reason interior-point codes like quasi-definite KKT systems.\\[3pt]
+Caveat we hit: with only $\pm\rho = \pm10^{-5}$ on the diagonal (the pure active-set systems) static pivoting is too unstable, so
+there we use a pivoted sparse LU, which is cheap because the active-set system lives on the support only.
 }
 \end{frame}
 
 % =====================================================================================
 \begin{frame}{\tagP\tagO\ Poker makes the Newton step cheaper}
 \begin{columns}[T]
-\column{0.52\textwidth}
+\column{0.5\textwidth}
 \begin{itemize}\setlength\itemsep{4pt}
-\item Rows with $(D_b)_{ii}\approx 0$ ($x_i = 0$ clearly optimal: action dropped) are identity rows: \textbf{eliminate} them.
-\item What remains: current support $+$ information sets.
-\item Equilibria in poker are \emph{mostly pure}: most hands take one action.
+\item Active-set steps solve only on the \emph{support} $+$ information sets: dropped actions are eliminated.
+\item Equilibria in poker are \emph{mostly pure}: mixing happens only at indifference.
+\item So the expensive dense hand$\times$hand blocks of $A$ shrink to the hands that actually reach each leaf.
 \end{itemize}
-\column{0.45\textwidth}
+\column{0.47\textwidth}
 \begin{block}{We computed (exact equilibria)}
 \small
 \begin{tabular}{@{}lcc@{}}
 & Leduc & small river \\ \midrule
 pure (infoset, hand) & \LeducPure\% & \SmallPure\% \\
 sequences in support & \LeducSupport\% & \SmallSupport\% \\
-Newton system size & \LeducN & \SmallN
+full system size & \LeducN & \SmallN
 \end{tabular}
 \end{block}
 \end{columns}
-\vspace{6pt}
-\textbf{The hybrid solver}
-\begin{enumerate}\small
-\item DCFR for $k$ iterations (cheap, global) $\to$ average strategy $(\bar x,\bar y)$;
-\item one best-response pass $\to$ duals $(p,q)$;
-\item proximal semismooth Newton ($\rho = 10^{-5}$) until the VI residual is $\le 10^{-13}$.
-\end{enumerate}
 \note{
 Mixing happens only at indifference, which is non-generic: in the exact Leduc equilibrium about half of the reachable
-(information set, hand) pairs play a single action; on the small river spot 71\%. The reduced Newton system keeps only
-sequences that are still ``undecided''.\\[3pt]
-Honest remark: the reduction is moderate on these spots (sizes 65--90\% of the full system during the solve) because
-the Fischer--Burmeister derivative only becomes exactly negligible once the iterate is close; a cleverer active-set
-prediction from the CFR iterate is an obvious improvement.
+(information set, hand) pairs play a single action; on the small river spot 71\%. About half of all sequences are outside the
+support, so active-set systems are roughly half the size of the full one --- and much sparser, because the payoff blocks
+only couple hands that reach a leaf with positive probability.
 }
 \end{frame}
 
@@ -696,7 +769,7 @@ prediction from the CFR iterate is an obvious improvement.
 \includegraphics[width=\linewidth]{hybrid_leduc.pdf}
 \column{0.38\textwidth}
 \begin{itemize}\small\setlength\itemsep{4pt}
-\item DCFR \LeducHybWarm\ iterations $+$ \LeducHybOuter\ prox steps (\LeducHybNewton\ Newton steps):
+\item DCFR \LeducHybWarm\ iterations (\LeducWarmTime\,s) $+$ finish (\LeducSolves\ linear solves, \LeducFinishTime\,s):
   exploitability $\LeducHybExpl$ in \alert{\LeducHybTime\,s}.
 \item CFR$^+$ after \LeducCFRplusLongTime\,s: $\LeducCFRplusLong$.
 \item Exact LP (HiGHS): 0.04\,s. At this size, the LP wins --- the point is the \emph{shape} of the curves.
@@ -707,23 +780,24 @@ Each pink curve starts where the DCFR warm start stopped (100, 300 or 1000 itera
 per proximal step. Starting from 100 DCFR iterations is enough; starting later only costs DCFR time.\\[3pt]
 The game value we obtain, $-0.085606424078\ldots$ chips for the first player, agrees with the LP to all printed digits.\\[3pt]
 Be upfront about the LP: Leduc is tiny (964 unknowns); a simplex method finishes in 40\,ms. The question is what happens when
-the LP does not fit --- next two slides.
+the LP does not fit --- next slides.
 }
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ Inside the finish: identify, then terminate}
+\begin{frame}{\tagO\ Inside the finish: every linear solve}
 \centering
-\includegraphics[width=0.8\textwidth]{newton_inner.pdf}\\[-4pt]
+\includegraphics[width=0.84\textwidth]{newton_inner.pdf}\\[-2pt]
 \begin{itemize}\small
-\item Each colour = one proximal subproblem. Long plateau: Newton is \emph{identifying the active set} (damped steps).
-\item Then the residual collapses in 1--3 steps: on a piecewise-linear problem, Newton with the right pieces is exact.
-\item Later subproblems start with the right active set: 2--7 Newton steps each.
+\item Blue: interior-point iterations of the first prox subproblem (steady, insensitive to the active set).
+\item Pink: active-set Newton steps --- crossover onto the exact subproblem solution, then 1--3 solves per prox step, three digits each.
+\item Total: \LeducSolves\ (Leduc) and \SmallSolves\ (small river) linear solves from the DCFR point to $10^{-13}$.
 \end{itemize}
 \note{
-This is the characteristic signature of semismooth Newton on complementarity problems: a globalisation phase in which the
-line search accepts partial steps while the active set changes, followed by finite termination (up to rounding) once the
-active set is right. Note that the warm start matters mostly for the length of the plateau.
+The VI residual of the original problem is plotted after every linear solve. The interior point has a small residual in the
+$\min(x,w)$ sense only because it is interior; the crossover step lands on the exact solution of the first \emph{regularised}
+subproblem, whose residual is $\rho\|z^1-z^0\|$ --- hence the jump. From then on each proximal step is solved exactly in one to three
+active-set steps.
 }
 \end{frame}
 
@@ -735,47 +809,60 @@ active set is right. Note that the warm start matters mostly for the length of t
 \column{0.38\textwidth}
 {\small Board K$\spadesuit$7$\diamondsuit$2$\clubsuit$T$\heartsuit$4$\spadesuit$, 147 vs 139 combos, bet 75\% / all-in.}
 \begin{itemize}\small\setlength\itemsep{4pt}
-\item Hybrid: $\SmallHybExpl$ chips in \alert{\SmallHybTime\,s} (\SmallHybNewton\ Newton steps).
+\item Hybrid: $\SmallHybExpl$ chips in \alert{\SmallHybTime\,s} (\SmallSolves\ linear solves).
 \item DCFR: $\SmallDCFRExpl$ after \SmallDCFRIters\ iterations (\SmallDCFRTime\,s).
 \item HiGHS LP: 1.6\,s.
 \end{itemize}
 \end{columns}
 \note{
 Same picture on a genuine no-limit river subgame with card removal and a non-trivial betting tree. The hybrid reaches
-machine precision about $10^{8}$ times more accurately than DCFR in less than half the time; DCFR's tail would need
-millions of iterations for the same accuracy. Here the LP is still competitive.\\[3pt]
+machine precision, about $10^{8}$ times more accurately than DCFR, in a fraction of the time; DCFR's tail would need
+millions of iterations for the same accuracy. Here the LP is about as fast.\\[3pt]
 Exploitability in chips with pot 100: $10^{-6}$ chips is $10^{-8}$ of the pot.
 }
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ Where it does not (yet) win: full-size ranges}
+\begin{frame}{\tagO\ Where it does not win (yet): the medium spot}
 \begin{columns}[T]
-\column{0.55\textwidth}
-Medium spot (473 vs 328 combos, 3 bet sizes):
+\column{0.5\textwidth}
+\includegraphics[width=\linewidth]{hybrid_medium.pdf}\\
+{\scriptsize 473 vs 328 combos, 3 bet sizes; 17{,}626 unknowns.}
+\column{0.48\textwidth}
 \begin{itemize}\small\setlength\itemsep{3pt}
-\item DCFR iteration: 3\,ms.
-\item One Newton step = one sparse LU of a $17{,}626\times17{,}626$ matrix with 5.9 M nonzeros:
-      \alert{25\,s}, 55 M nonzeros of fill (COLAMD).
-\item The dense hand$\times$hand payoff blocks fill in.
-\end{itemize}
-\vspace{4pt}
-\begin{block}{Verdict}
-\small CFR for the first digits, at scale. Newton for the last digits, while the (support-reduced) Newton system can be factored.
-\end{block}
-\column{0.42\textwidth}
-\textbf{How to scale it} (open):
-\begin{itemize}\small\setlength\itemsep{3pt}
-\item Newton--Krylov: products with $A$ cost one tree pass, $O(n\log n)$ per leaf by the semiseparable$+$sparse structure.
-\item Needs a preconditioner for $D_a + D_b(\rho I + \text{skew})$: hierarchical (HSS) factorisation of the payoff blocks?
-\item Better active-set prediction from the CFR iterate $\Rightarrow$ smaller systems.
+\item DCFR: $\MedDCFRLongExpl$ after 100{,}000 iterations (\MedDCFRLongTime\,s).
+\item Hybrid: $\MedHybExpl$ after \MedHybOuter\ prox steps (\MedHybTime\,s). \alert{CFR wins.}
+\item Why: equilibria are far from unique (many hands never matter) $\Rightarrow$ flat directions; with $\rho=10^{-5}$ a residual of
+      $10^{-6}$ can sit $0.1$ away from the subproblem's solution, so the crossover's active set is wrong.
+\item Larger $\rho = 10^{-3}$: crossover works (3--5 solves per step) but each prox step gains only $\sim$5\%.
 \end{itemize}
 \end{columns}
 \note{
-State the limitation plainly. With a direct sparse solver the Newton step costs as much as roughly 8{,}000 DCFR iterations on this
-spot, because the factorisation sees the payoff blocks as dense. A matrix-free Krylov method would have per-iteration cost equal
-to a CFR iteration, but the shifted skew system with $\rho = 10^{-5}$ is badly conditioned (eigenvalues $\rho + i\lambda$), so
-it needs a structured preconditioner. The structure is there --- semiseparable plus sparse --- but building the solver is future work.
+State the limitation plainly. On the medium spot each factorisation of the full system costs about 8\,s (quasi-definite
+$LDL^\top$; 25\,s with plain sparse LU), i.e.\ thousands of DCFR iterations, and the finish does not reach its fast regime: the
+crossover from the interior point lands on a wrong active set (the error is amplified by $\|(M+\rho I)^{-1}\|\approx 1/\rho$), so
+every proximal step falls back to a full interior-point solve. We also tried decreasing $\rho$ gradually from $10^{-3}$: the
+active-set steps track the solution down to $\rho\approx10^{-4}$ and then lose it.\\[3pt]
+So: at realistic sizes CFR remains the right tool for the practical accuracy range, and the second-order finish is a
+small-to-medium-size, high-precision tool --- for now.
+}
+\end{frame}
+
+% =====================================================================================
+\begin{frame}{\tagO\ How the finish could scale (open problems)}
+\begin{itemize}\setlength\itemsep{6pt}
+\item \textbf{Structured linear algebra.} Each payoff block is semiseparable $+$ sparse (slide on vectorised CFR):
+      products cost $O(n\log n)$, so Newton--Krylov steps would cost a few CFR iterations --- if the shifted-skew
+      systems $D + \rho I + \text{skew}$ get a good preconditioner (hierarchical / HSS factorisations of the blocks?).
+\item \textbf{Better-conditioned regularisation.} Regularise only the directions that matter, e.g.\ weighted proximal terms
+      $\|z-z^k\|_W^2$ with $W$ from reach probabilities; or select a particular equilibrium (refinements) to remove the flat directions.
+\item \textbf{Smarter active-set prediction} from CFR regrets (actions with negative regret are out) $\Rightarrow$ smaller systems
+      and a crossover that does not need an interior-point phase.
+\end{itemize}
+\note{
+These are honest research directions, not results. The first is the one I would bet on: the poker-specific structure that makes
+CFR fast (sorting, prefix sums, card-removal corrections) is exactly the structure a fast direct or preconditioned iterative
+solver for the Newton systems would need.
 }
 \end{frame}
 
@@ -783,16 +870,18 @@ it needs a structured preconditioner. The structure is there --- semiseparable p
 \begin{frame}{\tagO\ What is new here, and what is not}
 \begin{itemize}\setlength\itemsep{5pt}
 \item \textbf{Not new}: sequence-form LP (von Stengel 1996); proximal point (Rockafellar 1976);
-      FB semismooth Newton (Fischer 1992; De Luca--Facchinei--Kanzow 1996); CFR family.
+      semismooth Newton / active-set methods (Qi--Sun 1993; Hinterm\"uller--Ito--Kunisch 2002); interior point $+$ crossover;
+      quasi-definite $LDL^\top$ (Vanderbei 1995); the CFR family.
 \item \textbf{Closest work}: Yang, Gao, Lin \& Kroer (arXiv 2512.12910, 2025):
       semismooth Newton for \emph{matrix} games via Douglas--Rachford splitting, warm-started by PRM$^+$; experiments on
       normal-form games (Kuhn as a $27\times64$ matrix).
 \item \textbf{Here}:
   \begin{itemize}\small
-  \item Newton directly on the \emph{sequence-form} complementarity system of extensive-form poker;
-  \item skew-monotone VI $+$ proximal regularisation $\Rightarrow$ uniformly nonsingular Newton matrices (one-line proof);
-  \item CFR iterate $+$ best-response values as a primal--dual warm start;
-  \item tested on Leduc and no-limit river subgames with card removal.
+  \item a second-order finish directly on the \emph{sequence-form} complementarity system of extensive-form poker;
+  \item skew-monotone VI $+$ proximal regularisation $\Rightarrow$ uniformly nonsingular Newton matrices (one-line proof)
+        and quasi-definite linear algebra;
+  \item CFR average $+$ best-response values as a primal--dual warm start;
+  \item tested on Leduc and no-limit river subgames with card removal --- including where it fails.
   \end{itemize}
 \item To our knowledge no poker solver uses a second-order finish.
 \end{itemize}
@@ -800,8 +889,8 @@ it needs a structured preconditioner. The structure is there --- semiseparable p
 Be precise about novelty. The general idea ``first-order warm start, then semismooth Newton'' for zero-sum games was proposed
 for matrix games by Yang, Gao, Lin and Kroer in December 2025; their Newton system lives on the normal form and they do not
 treat extensive-form structure. Our contribution is the extensive-form, sequence-form version with a different regularisation
-(proximal point on the skew VI), a CFR-based dual warm start, and the poker experiments. Commercial and research poker
-solvers we know of (PioSolver, GTO+, Libratus, DeepStack) are first-order (CFR variants).
+(proximal point on the skew VI), the quasi-definite linear algebra, a CFR-based dual warm start, and the poker experiments.
+Commercial and research poker solvers we know of (PioSolver, GTO+, Libratus, DeepStack) are first-order (CFR variants).
 }
 \end{frame}
 
@@ -813,9 +902,10 @@ solvers we know of (PioSolver, GTO+, Libratus, DeepStack) are first-order (CFR v
 \item CFR = regret matching at every information set: a matrix-free, nonsmooth first-order method with a provable $O(T^{-1/2})$
       rate and a much better practical one --- plus numerical tricks (projection, discounting, optimism, Gauss--Seidel).
 \item The solver's output is readable poker: polarised betting, block bets, pot-odds defence (to within 1.5\%).
-\item Read the equilibrium conditions as a \textbf{skew-monotone VI}: proximal point $+$ Fischer--Burmeister semismooth Newton
-      turns CFR's slow tail into a few linear solves and reaches $10^{-13}$.
-\item Scaling the finish is a structured numerical linear algebra problem (semiseparable $+$ sparse blocks).
+\item Read the equilibrium conditions as a \textbf{skew-monotone VI}: proximal point $+$ semismooth (active-set) Newton,
+      started by an interior-point crossover, turns CFR's slow tail into $\sim$20 linear solves and reaches $10^{-13}$ ---
+      on small and mid-sized spots.
+\item At realistic sizes CFR still wins; scaling the finish is a structured linear-algebra and conditioning problem.
 \end{enumerate}
 \vspace{6pt}
 {\small Code: \texttt{github.com/dwangnumbers/Poker-Solver} --- solver, benchmarks, figures, these slides.}
@@ -842,6 +932,8 @@ shifted skew systems whose off-diagonal blocks are semiseparable-plus-sparse.
 \item M.~Johanson. Measuring the size of large no-limit poker games. arXiv:1302.7008 (2013).
 \item M.~Johanson, K.~Waugh, M.~Bowling, M.~Zinkevich. Accelerating best response calculation in large extensive games. \emph{IJCAI} 2011.
 \item D.~Koller, N.~Megiddo, B.~von Stengel. Efficient computation of equilibria for extensive two-person games. \emph{Games Econ.\ Behav.} 14 (1996).
+\item M.~Hinterm\"uller, K.~Ito, K.~Kunisch. The primal-dual active set strategy as a semismooth Newton method. \emph{SIAM J.\ Optim.} 13 (2002).
+\item S.~Mehrotra. On the implementation of a primal-dual interior point method. \emph{SIAM J.\ Optim.} 2 (1992).
 \item H.~W. Kuhn. A simplified two-person poker. \emph{Contributions to the Theory of Games} I (1950).
 \item F.~J. Luque. Asymptotic convergence analysis of the proximal point algorithm. \emph{SIAM J.\ Control Optim.} 22 (1984).
 \item M.~Morav\v{c}\'ik et al. DeepStack: expert-level artificial intelligence in heads-up no-limit poker. \emph{Science} 356 (2017).
@@ -851,6 +943,8 @@ shifted skew systems whose off-diagonal blocks are semiseparable-plus-sparse.
 \item F.~Southey et al. Bayes' bluff: opponent modelling in poker. \emph{UAI} 2005.
 \item O.~Tammelin. Solving large imperfect information games using CFR$^+$. arXiv:1407.5042 (2014).
 \item A.~Toth, C.~T. Kelley. Convergence analysis for Anderson acceleration. \emph{SIAM J.\ Numer.\ Anal.} 53 (2015).
+\item R.~J. Vanderbei. Symmetric quasidefinite matrices. \emph{SIAM J.\ Optim.} 5 (1995).
+\item B.~Stellato, G.~Banjac, P.~Goulart, A.~Bemporad, S.~Boyd. OSQP: an operator splitting solver for quadratic programs. \emph{Math.\ Program.\ Comput.} 12 (2020). (QDLDL)
 \item B.~von Stengel. Efficient computation of behavior strategies. \emph{Games Econ.\ Behav.} 14 (1996).
 \item H.~F. Walker, P.~Ni. Anderson acceleration for fixed-point iterations. \emph{SIAM J.\ Numer.\ Anal.} 49 (2011).
 \item D.~Yang, Y.~Gao, T.~Lin, C.~Kroer. A direct second-order method for solving two-player zero-sum games. arXiv:2512.12910 (2025).
@@ -866,7 +960,7 @@ shifted skew systems whose off-diagonal blocks are semiseparable-plus-sparse.
 \toprule
 \texttt{games.py} & Kuhn, Leduc, no-limit river builder (7-card evaluator, card removal, range notation) \\
 \texttt{cfr.py} & range-vectorised public-tree CFR / CFR$^+$ / DCFR / PCFR$^+$, alternating updates, best response, exploitability \\
-\texttt{seqform.py} & sequence form $(E,F,A)$, dual estimates from best responses, prox semismooth Newton (FB, reduced) \\
+\texttt{seqform.py} & sequence form $(E,F,A)$, dual estimates from best responses; \texttt{ProxIPMPDAS} (the method of the talk), FB variants, earlier attempts \\
 \texttt{lp.py} & reference LP via HiGHS \\
 \texttt{aa.py}, \texttt{extrap.py} & the negative results (Anderson, RRE) \\
 \texttt{bench\_*.py}, \texttt{fig\_*.py} & every number and figure in these slides \\ \bottomrule
@@ -881,7 +975,7 @@ shifted skew systems whose off-diagonal blocks are semiseparable-plus-sparse.
 \end{frame}
 
 \begin{frame}{Backup: effect of the proximal parameter}
-\small We computed (Leduc, warm start DCFR 200 iterations, final exploitability $\le 10^{-13}$ in all cases):\\[6pt]
+\small We computed (Fischer--Burmeister variant; Leduc, warm start DCFR 200 iterations, final exploitability $\le 10^{-13}$ in all cases):\\[6pt]
 \begin{tabular}{lcccc}
 \toprule
 $\rho$ & $10^{-3}$ & $10^{-4}$ & $10^{-5}$ & $10^{-6}$ \\ \midrule

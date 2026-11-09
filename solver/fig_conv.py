@@ -43,7 +43,7 @@ def hybrid(game, base_file, newton_file, unit_scale=1.0, ylabel='exploitability 
     if newton_file and os.path.exists(R + newton_file):
         runs = json.load(open(R + newton_file))
         for i, r in enumerate(runs):
-            o = np.array([(x[4], x[3]) for x in r['outer']])
+            o = np.array([(x[4], x[3]) for x in r['outer']], dtype=float)
             o[:, 1] = np.maximum(o[:, 1], 1e-16)
             ax.loglog(o[:, 0], o[:, 1] * unit_scale, color=C['ours'], lw=1.6, marker='o', ms=4,
                       label=LBL['ours'] if i == 0 else None)
@@ -61,5 +61,5 @@ if __name__ == '__main__':
     hybrid('leduc', long, 'newton_leduc.json', out='hybrid_leduc.pdf', lp_time=0.04, base_algos=('cfr+', 'dcfr'))
     hybrid('small', 'baselines_river_small.json', 'newton_small.json', unit_scale=1.0,
            ylabel='exploitability (chips, pot = 100)', out='hybrid_small.pdf', lp_time=1.6)
-    hybrid('medium', 'baselines_river_medium.json', 'newton_medium.json', unit_scale=1.0,
-           ylabel='exploitability (chips, pot = 100)', out='hybrid_medium.pdf')
+    hybrid('medium', 'baselines_river_medium_long.json', 'newton_medium.json', unit_scale=1.0,
+           ylabel='exploitability (chips, pot = 100)', out='hybrid_medium.pdf', base_algos=('cfr+', 'dcfr'))

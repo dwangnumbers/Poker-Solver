@@ -28,7 +28,16 @@ out['MedDCFRIters'] = f"{M['dcfr'][-1][0]:,}".replace(',', '{,}')
 if os.path.exists(R + 'newton_medium.json'):
     NM = json.load(open(R + 'newton_medium.json'))[0]
     out['MedHybTime'] = f"{NM['outer'][-1][4]:.0f}"; out['MedHybExpl'] = e(NM['outer'][-1][3])
-    out['MedHybNewton'] = str(NM['newton_steps']); out['MedHybOuter'] = str(NM['outer'][-1][0])
+    out['MedHybOuter'] = str(NM['outer'][-1][0])
+ML = json.load(open(R + 'baselines_river_medium_long.json'))
+out['MedDCFRLongExpl'] = e(ML['dcfr'][-1][2]); out['MedDCFRLongTime'] = f"{ML['dcfr'][-1][1]:.0f}"
+out['MedCFRpLongExpl'] = e(ML['cfr+'][-1][2])
+for nm, f in (('Leduc', 'newton_leduc.json'), ('Small', 'newton_small.json')):
+    for r in json.load(open(R + f)):
+        if (nm == 'Leduc' and r['warm'] == 100) or (nm == 'Small' and r['warm'] == 1000):
+            out[nm + 'Solves'] = str(r['newton_steps']); out[nm + 'IPM'] = str(r.get('ipm_iters', ''))
+            out[nm + 'FinishTime'] = f"{r['outer'][-1][4] - r['warm_time']:.2f}"
+            out[nm + 'WarmTime'] = f"{r['warm_time']:.2f}" 
 P = json.load(open(R + 'purity.json'))
 for k, nm in (('leduc', 'Leduc'), ('small', 'Small')):
     out[nm + 'Pure'] = f"{100 * P[k]['pure'] / P[k]['reach']:.0f}"
