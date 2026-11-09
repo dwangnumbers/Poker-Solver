@@ -81,7 +81,7 @@
 \begin{frame}
   \titlepage
 \note{
-\textbf{Timing plan (60 min, 38 slides).} Hook \& rules 6 $\cdot$ Games, equilibria, sequence form 11 $\cdot$
+\textbf{Timing plan (60 min, 40 slides).} Hook \& rules 6 $\cdot$ Games, equilibria, sequence form 11 $\cdot$
 Regret minimisation and CFR 13 $\cdot$ What solutions look like 6 $\cdot$ The new method 13 $\cdot$ Demo, results, limits, wrap-up 11.\\
 If running late, skip: ``Kuhn poker'', ``Modern CFR = numerical tricks'' (one sentence), ``Attempt 1: Anderson'' (one sentence),
 ``The linear algebra'' (one sentence: quasi-definite, so any ordering works), backup slides.\\[4pt]
@@ -183,6 +183,27 @@ Keep this light --- most of the audience has played or watched poker. The key st
 which poker players call a \textbf{range}.\\[3pt]
 The river spot is fixed for the whole talk: board K$\spadesuit$ 7$\diamondsuit$ 2$\clubsuit$ T$\heartsuit$ 4$\spadesuit$, pot 100, both players
 have 100 behind. Big blind may check or bet 33\%, 75\% of pot or all-in; facing a bet you may fold, call or go all-in.
+}
+\end{frame}
+
+% =====================================================================================
+\begin{frame}{\tagP\ Ranges: what a solver takes as input}
+\begin{columns}[T]
+\column{0.62\textwidth}
+\centering
+\includegraphics[width=\linewidth]{ranges.pdf}
+\column{0.36\textwidth}
+\begin{itemize}\small\setlength\itemsep{4pt}
+\item A \textbf{range} = a probability vector over two-card combinations: $\binom{52}{2} = 1326$, and $\binom{47}{2} = 1081$ once the board is known.
+\item Here: big blind called a raise, Button opened (illustrative).
+\item Bar width = combinations still possible given the board: \emph{card removal} (K$\spadesuit$ on board $\Rightarrow$ fewer Kx).
+\item Output: for every public node and every hand, a distribution over actions.
+\end{itemize}
+\end{columns}
+\note{
+The 13-by-13 grid is the standard poker picture: pairs on the diagonal, suited hands above, offsuit below. Each cell is a class
+(e.g.\ ``AKs'' = 4 combinations). Mathematically the input is just two nonnegative vectors $r_1\in\R^{n_1}$, $r_2\in\R^{n_2}$,
+and card removal is a 0/1 compatibility matrix $C$ between them --- both will appear in every formula from now on.
 }
 \end{frame}
 
@@ -420,6 +441,55 @@ local regrets, each minimised by plain regret matching. This is why CFR scales: 
 storage is linear in the number of information-set actions.\\[3pt]
 In linear-algebra language one CFR iteration computes $Ay$ and $A^\top x$ (with $x,y$ the current realisation plans) by tree
 traversals --- the same two products a first-order saddle-point method needs.
+}
+\end{frame}
+
+% =====================================================================================
+\begin{frame}{\tagP\tagM\ The public tree of our river spot}
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,
+  bb/.style={circle,fill=cblue,text=white,inner sep=1.2pt,font=\tiny\bfseries},
+  bt/.style={circle,fill=corange,text=white,inner sep=1.2pt,font=\tiny\bfseries},
+  lf/.style={rectangle,draw=ink2,fill=lightgray,inner sep=1.4pt,font=\tiny},
+  e/.style={draw=ink2,-},
+  lab/.style={font=\tiny,fill=paper,inner sep=0.5pt}]
+  \node[bb] (r) at (0,0) {BB};
+  % after check
+  \node[bt] (c) at (-4.2,-1.2) {BTN};
+  \draw[e] (r) -- node[lab]{check} (c);
+  \node[lf] (cc) at (-6.3,-2.5) {SD};          \draw[e] (c) -- node[lab]{check} (cc);
+  \foreach \x/\t/\n in {-5.0/33/a, -3.6/75/b}{
+    \node[bb] (c\n) at (\x,-2.5) {BB}; \draw[e] (c) -- node[lab]{bet \t} (c\n);
+    \node[lf] at (\x-0.45,-3.6) {F}; \node[lf] at (\x,-3.6) {SD}; \node[bt] (cj\n) at (\x+0.5,-3.6) {BTN};
+    \draw[e] (c\n) -- (\x-0.45,-3.45); \draw[e] (c\n) -- (\x,-3.45); \draw[e] (c\n) -- (cj\n);
+    \node[lf] at (\x+0.25,-4.6) {F}; \node[lf] at (\x+0.75,-4.6) {SD};
+    \draw[e] (cj\n) -- (\x+0.25,-4.45); \draw[e] (cj\n) -- (\x+0.75,-4.45);
+  }
+  \node[bb] (cj) at (-2.2,-2.5) {BB}; \draw[e] (c) -- node[lab]{jam} (cj);
+  \node[lf] at (-2.45,-3.6) {F}; \node[lf] at (-1.95,-3.6) {SD};
+  \draw[e] (cj) -- (-2.45,-3.45); \draw[e] (cj) -- (-1.95,-3.45);
+  % BB bets
+  \foreach \x/\t/\n in {0.4/33/a, 2.4/75/b}{
+    \node[bt] (b\n) at (\x,-1.6) {BTN}; \draw[e] (r) -- node[lab]{bet \t} (b\n);
+    \node[lf] at (\x-0.5,-2.7) {F}; \node[lf] at (\x,-2.7) {SD}; \node[bb] (bj\n) at (\x+0.55,-2.7) {BB};
+    \draw[e] (b\n) -- (\x-0.5,-2.55); \draw[e] (b\n) -- (\x,-2.55); \draw[e] (b\n) -- (bj\n);
+    \node[lf] at (\x+0.3,-3.7) {F}; \node[lf] at (\x+0.8,-3.7) {SD};
+    \draw[e] (bj\n) -- (\x+0.3,-3.55); \draw[e] (bj\n) -- (\x+0.8,-3.55);
+  }
+  \node[bt] (bj) at (4.5,-1.6) {BTN}; \draw[e] (r) -- node[lab]{jam} (bj);
+  \node[lf] at (4.25,-2.7) {F}; \node[lf] at (4.75,-2.7) {SD};
+  \draw[e] (bj) -- (4.25,-2.55); \draw[e] (bj) -- (4.75,-2.55);
+\end{tikzpicture}\\[4pt]
+\begin{minipage}{0.92\textwidth}\small
+12 decision nodes, 21 leaves (F = fold, SD = showdown). At each node the solver stores \emph{vectors} over hands:
+reach $\pi_{\text{BB}}\in\R^{473}$, $\pi_{\text{BTN}}\in\R^{328}$, regrets and average strategy as $473\times|A|$ or $328\times|A|$ arrays.
+One CFR iteration = one sweep down (reaches) and up (values) this tree.
+\end{minipage}
+\note{
+This is the bridge between the game-theory picture (a tree with information sets) and the implementation: in poker the
+information sets at a public node are indexed by the acting player's private hand, so ``all information sets at this node''
+is a vector, and every CFR operation becomes a vector operation. The leaves are where the opponent's range enters, through the
+matrices on the next slide.
 }
 \end{frame}
 
