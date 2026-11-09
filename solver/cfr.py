@@ -59,8 +59,9 @@ class Tree:
             return v
         return rec(g.root, r0[p].copy(), r0[1 - p].copy())
 
-    def best_response_value(self, p, sigma):
-        """Root best-response counterfactual value vector of player p against sigma[-p]."""
+    def best_response_value(self, p, sigma, node_values=None):
+        """Root best-response counterfactual value vector of player p against sigma[-p].
+        If node_values is a dict, store the BR value vector at each of p's decision nodes."""
         g = self.g
 
         def rec(node, pi_opp):
@@ -74,7 +75,10 @@ class Tree:
                 return v
             if node.player == p:
                 vals = [rec(c, pi_opp) for c in node.children]
-                return np.max(np.stack(vals, axis=1), axis=1)
+                best = np.max(np.stack(vals, axis=1), axis=1)
+                if node_values is not None:
+                    node_values[node.idx] = best
+                return best
             s = sigma[node.idx]
             v = 0.0
             for a, c in enumerate(node.children):
@@ -113,7 +117,7 @@ class Tree:
 # Baseline solvers.  Each returns a history of (iteration, exploitability of average, of last iterate).
 # ================================================================================================
 
-def solve(game, algo='cfr+', iters=1000, log_every=10, alpha=1.5, beta=0.0, gamma=2.0, callback=None):
+def solve(game, algo='cfr+', iters=1000, log_every=10, alpha=1.5, beta=0.0, gamma=2.0, callback=None, snap=None):
     T = Tree(game)
     R = T.zeros()
     S = T.zeros()                    # cumulative (weighted) strategy
@@ -153,6 +157,8 @@ def solve(game, algo='cfr+', iters=1000, log_every=10, alpha=1.5, beta=0.0, gamm
                     a = t ** alpha / (t ** alpha + 1.0)
                     b = t ** beta / (t ** beta + 1.0)
                     R[i] = np.where(R[i] > 0, R[i] * a, R[i] * b) + ri
+        if snap is not None:
+            snap(t, T, S, R)
         if t % log_every == 0 or t == 1 or t == iters:
             avg = T.normalize_avg(S)
             if algo == 'pcfr+':
