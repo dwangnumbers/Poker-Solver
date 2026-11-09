@@ -571,7 +571,7 @@ usual one in the literature for Leduc. Note the tail: to go from $10^{-5}$ to $1
 \begin{frame}{\tagP\ What a solution looks like: first actions}
 \centering
 \includegraphics[width=0.74\textwidth]{grid_root.pdf}\\
-{\scriptsize We computed (DCFR, 5{,}000 iterations, exploitability $\MedDCFRExpl$ chips). Upper triangle: suited; lower: offsuit; grey: not in range.
+{\scriptsize We computed (exact equilibrium: DCFR $+$ our finish, exploitability $\SuppMedExpl$ chips). Upper triangle: suited; lower: offsuit; grey: not in range.
 Each cell shows the action mix, weighted over its combinations.}
 \note{
 Read the grid like a solver user. Big blind (left): checks most of the range, uses a small 33\% bet with medium hands
@@ -591,7 +591,7 @@ Aggregate frequencies (we computed): big blind checks 82\%, bets 33\% pot 16\%; 
 \column{0.6\textwidth}
 {\scriptsize\setlength\tabcolsep{4pt}
 \input{mdf_table.tex}}\\[4pt]
-\small Button: MDF to within 1.5 points. Big blind \emph{under}-defends: the Button's marginal bluffs have showdown value,
+\small Exact equilibrium. Button: MDF to within 1.5 points. Big blind \emph{under}-defends: the Button's marginal bluffs have showdown value,
 so they are indifferent at EV$>0$, not at $0$.
 \end{columns}
 \note{

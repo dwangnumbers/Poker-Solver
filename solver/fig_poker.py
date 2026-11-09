@@ -90,6 +90,8 @@ if __name__ == '__main__':
         if n.actions[0] != 'fold':
             continue
         p = n.player; w = REACH[n.idx][p]
+        if w.sum() <= 1e-12:
+            print(f'{n.name}: never reached in this equilibrium'); continue
         # the bet faced: from node name contributions
         c = [float(v) for v in n.name[3:].split('-')]
         bet = abs(c[1] - c[0]); pot_before = 100 + 2 * min(c)

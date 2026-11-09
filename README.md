@@ -123,7 +123,7 @@ python3 bench_newton.py leduc 100 300 1000             # finish on the full (unr
 python3 bench_newton.py small 300 1000 3000
 python3 bench_newton.py medium 1000                    # slow: minutes per proximal step (our run was stopped after 3); CFR wins here
 python3 bench_river.py medium 100000 dcfr,cfr+ _long
-python3 solve_spot.py 5000                             # strategy of the medium spot for the grids
+python3 solve_spot.py 3000 exact                       # exact equilibrium of the medium spot for the grids
 python3 bench_river.py medium 190000 dcfr _long2
 python3 fig_conv.py; python3 fig_poker.py; python3 fig_newton.py; python3 fig_rm.py; python3 fig_ranges.py
 python3 gen_numbers.py
