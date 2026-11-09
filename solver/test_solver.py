@@ -5,6 +5,7 @@ warnings.filterwarnings('ignore')
 from games import kuhn, leduc, river, card, eval7, expand_range, BB_CALL, BTN_OPEN
 from cfr import solve
 from seqform import SeqForm, ProxIPMPDAS
+from support import solve_support
 from lp import solve_lp
 from bench_river import SMALL
 
@@ -51,6 +52,13 @@ def test_river_matches_lp():
     *_, v0, v1 = solve_lp(sf)
     assert sf.T.exploitability(sigma) < 1e-12
     assert abs(sf.T.game_value(sigma) - v0) < 1e-9
+
+def test_support_finish():
+    g = river(**SMALL)
+    T, R, S, h = solve(g, 'dcfr', iters=300, log_every=300)
+    sf = SeqForm(g)
+    sigma, info = solve_support(sf, T.normalize_avg(S), tau=1e-3, verbose=False)
+    assert sf.T.exploitability(sigma) < 1e-11
 
 def test_cfr_converges():
     g = leduc()

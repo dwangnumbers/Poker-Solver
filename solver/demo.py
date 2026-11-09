@@ -1,4 +1,4 @@
-"""Live demo for the talk (about 5 seconds): solve a river spot with DCFR, then the second-order finish,
+"""Live demo for the talk (about 2 seconds): solve a river spot with DCFR, then the second-order finish,
 and print what a few hands do.
 
     python3 demo.py                 # small spot
@@ -9,7 +9,8 @@ import numpy as np
 warnings.filterwarnings('ignore')
 from games import river
 from cfr import solve
-from seqform import SeqForm, ProxIPMPDAS
+from seqform import SeqForm
+from support import solve_support
 from bench_river import SMALL
 
 g = river(**SMALL)
@@ -19,11 +20,12 @@ T, R, S, hist = solve(g, 'dcfr', iters=1000, log_every=250,
                       callback=lambda t, h: print(f'  DCFR {t:5d} iterations   exploitability {h[1]:.2e} chips'))
 t1 = time.time()
 sf = SeqForm(g)
-fin = ProxIPMPDAS(sf)
-sigma, z, fh = fin.solve(T.normalize_avg(S), rho=1e-5)
+print('restrict to the predicted support, solve exactly, verify:')
+sigma, info = solve_support(sf, T.normalize_avg(S), tau=1e-3, verbose=False)
 t2 = time.time()
-for (k, n, r, e), how in zip(fh[1:], fin.log):
-    print(f'  prox step {k}  ({how[1]:8s} {how[2]:2d} linear solves)   exploitability {e:.2e} chips')
+for r in info:
+    print(f"  round {r['round']}: {r['n_vars']} unknowns, {r['solves']:2d} linear solves, "
+          f"full-game exploitability {r['expl']:.2e} chips, {r['added']} actions added back")
 print(f'DCFR {t1 - t0:.1f}s, finish {t2 - t1:.1f}s;  game value for the big blind: {sf.T.game_value(sigma):+.10f} chips')
 
 root = g.decisions[0]

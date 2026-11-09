@@ -141,8 +141,8 @@ mbb/hand = thousandths of a big blind per hand.
 \begin{itemize}
 \item The equilibrium of a poker game is the solution of a (huge, structured) bilinear saddle-point problem.
 \item Solvers use a \emph{first-order}, matrix-free iteration: cheap steps, slow tail.
-\item Our contribution: treat the end of the solve as a \emph{nonsmooth equation} and finish with a
-      proximal semismooth Newton method, warm-started by the solver.
+\item Our contribution: treat the end of the solve as a \emph{nonsmooth equation} on the solver's predicted support and
+      finish with a proximal semismooth Newton method --- machine precision where CFR needs millions of iterations.
 \end{itemize}
 \note{
 Say what the audience will get: (1) enough poker to read a solver output, (2) the mathematics of why CFR converges
@@ -750,14 +750,13 @@ took steps of size $10^{-3}$ for dozens of iterations. That is what pushed us to
 \textbf{Later} subproblems: active-set Newton from the previous solution (successive prox points share their active set):
 1--3 linear solves each.
 \column{0.42\textwidth}
-\begin{block}{The hybrid solver}
+\begin{block}{One exact solve}
 \small
 \begin{enumerate}\setlength\itemsep{2pt}
-\item DCFR, $k$ iterations $\to (\bar x,\bar y)$;
-\item one best-response pass $\to (p,q)$;
+\item warm start: CFR average $(\bar x,\bar y)$, duals $(p,q)$ from one best-response pass;
 \item prox step 1: IPM $+$ crossover;
 \item prox steps $2,3,\dots$: active-set Newton;
-\item stop at VI residual $10^{-13}$.
+\item stop at VI residual $10^{-12}$.
 \end{enumerate}
 $\rho = 10^{-5}$ throughout.
 \end{block}
@@ -835,21 +834,55 @@ only couple hands that reach a leaf with positive probability.
 \end{frame}
 
 % =====================================================================================
+\begin{frame}{\tagP\tagO\ The full method: restrict, solve exactly, verify}
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{enumerate}\small\setlength\itemsep{3pt}
+\item \textbf{DCFR}, a few thousand iterations (cheap, global).
+\item \textbf{Predict the support}: keep actions with average probability $\ge\tau = 10^{-3}$.
+\item \textbf{Restrict}: keep only information sets that \emph{both} players can reach with kept actions
+      (card removal included). Everything else stays at the CFR strategy.
+\item \textbf{Solve the restricted VI exactly}: proximal point, IPM $+$ crossover, active-set Newton.
+\item \textbf{Verify} in the full game: a pruned action with positive counterfactual regret is a profitable
+      deviation $\Rightarrow$ add it back, go to 3.
+\end{enumerate}
+\column{0.47\textwidth}
+\begin{block}{Why restrict?}
+\small The equilibrium set is \emph{flat} in exactly the removed directions: never-played actions, and positions the
+opponent never lets you reach. They make the full VI ill-conditioned; the restricted one is not.
+\end{block}
+\vspace{4pt}
+\begin{block}{Certificate}
+\small Step 5 computes exact best responses: the final exploitability is \emph{measured} in the full game, not assumed.
+\end{block}
+\end{columns}
+\note{
+The verification loop is column generation, the same idea as double-oracle algorithms for games (McMahan, Gordon \& Blum 2003;
+Bo\v{s}ansk\'y et al.\ 2014 for extensive-form games); what is new here is the combination with a CFR-predicted support and an exact
+second-order solve of the restricted problem.\\[3pt]
+On our spots: Leduc needed 2 rounds, the small river 1, the medium river 3 (16 actions added back in total). The restricted
+problem had about 35\% of the unknowns of the full one on the medium spot.\\[3pt]
+Why it fixes the medium spot: the earlier failure came from flat directions --- a residual of $10^{-6}$ could sit far from the
+solution, so the crossover guessed the wrong active set. Removing the directions that do not matter removes the flatness.
+}
+\end{frame}
+
+% =====================================================================================
 \begin{frame}{\tagO\ We computed: Leduc hold'em}
 \begin{columns}[c]
 \column{0.6\textwidth}
 \includegraphics[width=\linewidth]{hybrid_leduc.pdf}
 \column{0.38\textwidth}
 \begin{itemize}\small\setlength\itemsep{4pt}
-\item DCFR \LeducHybWarm\ iterations (\LeducWarmTime\,s) $+$ finish (\LeducSolves\ linear solves, \LeducFinishTime\,s):
-  exploitability $\LeducHybExpl$ in \alert{\LeducHybTime\,s}.
+\item DCFR \SuppLeducWarm\ iterations $+$ finish (\SuppLeducRounds\ rounds, \SuppLeducSolves\ linear solves):
+  exploitability $\SuppLeducExpl$ in \alert{\SuppLeducTime\,s}.
 \item CFR$^+$ after \LeducCFRplusLongTime\,s: $\LeducCFRplusLong$.
 \item Exact LP (HiGHS): 0.04\,s. At this size, the LP wins --- the point is the \emph{shape} of the curves.
 \end{itemize}
 \end{columns}
 \note{
-Each pink curve starts where the DCFR warm start stopped (100, 300 or 1000 iterations) and then drops vertically: three digits
-per proximal step. Starting from 100 DCFR iterations is enough; starting later only costs DCFR time.\\[3pt]
+Each pink curve starts where the DCFR warm start stopped (100, 300 or 1000 iterations) and then drops vertically to machine
+precision; points are verification rounds. Starting from 100 DCFR iterations is enough (one extra round); starting later only costs DCFR time.\\[3pt]
 The game value we obtain, $-0.085606424078\ldots$ chips for the first player, agrees with the LP to all printed digits.\\[3pt]
 Be upfront about the LP: Leduc is tiny (964 unknowns); a simplex method finishes in 40\,ms. The question is what happens when
 the LP does not fit --- next slides.
@@ -857,13 +890,13 @@ the LP does not fit --- next slides.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ Inside the finish: every linear solve}
+\begin{frame}{\tagO\ Inside one exact solve: every linear solve}
 \centering
 \includegraphics[width=0.84\textwidth]{newton_inner.pdf}\\[-2pt]
 \begin{itemize}\small
 \item Blue: interior-point iterations of the first prox subproblem (steady, insensitive to the active set).
 \item Pink: active-set Newton steps --- crossover onto the exact subproblem solution, then 1--3 solves per prox step, three digits each.
-\item Total: \LeducSolves\ (Leduc) and \SmallSolves\ (small river) linear solves from the DCFR point to $10^{-13}$.
+\item Total: \LeducSolves\ (Leduc) and \SmallSolves\ (small river) linear solves from the DCFR point to $10^{-13}$ (full, unrestricted VI shown).
 \end{itemize}
 \note{
 The VI residual of the original problem is plotted after every linear solve. The interior point has a small residual in the
@@ -874,12 +907,12 @@ active-set steps.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}[fragile]{\tagP\tagO\ Live demo: \texttt{python3 solver/demo.py} (2 seconds)}
+\begin{frame}[fragile]{\tagP\tagO\ Live demo: \texttt{python3 solver/demo.py} (1 second)}
 \VerbatimInput[fontsize=\fontsize{7.3}{8.4}\selectfont,frame=single,rulecolor=\color{lightgray}]{../results/demo_output.txt}
 \note{
 Run it live if the room allows (Python 3 with numpy, scipy, qdldl). The output above is a captured run. Points to make:
-DCFR gains a digit per few hundred iterations; the first prox step (interior point $+$ crossover, about ten linear solves) gains
-more than an order of magnitude, and each later prox step costs one or two linear solves and gains about two digits.\\[3pt]
+DCFR gains a digit per few hundred iterations; the finish restricts to the 1{,}896 unknowns that matter (two thirds of the
+problem), solves them exactly with 16 linear solves, and the full-game best responses certify $10^{-12}$ --- in 0.6\,s.\\[3pt]
 Poker reading: QJs (no pair, no showdown value) is the bluff --- it bets; AK bets for thin value/protection; sets of tens check
 (to check-raise); 77 mixes check and jam --- an exact mixed strategy, which the Newton finish computes to machine precision.
 }
@@ -893,7 +926,7 @@ Poker reading: QJs (no pair, no showdown value) is the bluff --- it bets; AK bet
 \column{0.38\textwidth}
 {\small Board K$\spadesuit$7$\diamondsuit$2$\clubsuit$T$\heartsuit$4$\spadesuit$, 147 vs 139 combos, bet 75\% / all-in.}
 \begin{itemize}\small\setlength\itemsep{4pt}
-\item Hybrid: $\SmallHybExpl$ chips in \alert{\SmallHybTime\,s} (\SmallSolves\ linear solves).
+\item Ours: $\SuppSmallExpl$ chips in \alert{\SuppSmallTime\,s} (DCFR \SuppSmallWarm\ its, \SuppSmallRounds\ round, \SuppSmallSolves\ linear solves).
 \item DCFR: $\SmallDCFRExpl$ after \SmallDCFRIters\ iterations (\SmallDCFRTime\,s).
 \item HiGHS LP: 1.6\,s.
 \end{itemize}
@@ -907,33 +940,30 @@ Exploitability in chips with pot 100: $10^{-6}$ chips is $10^{-8}$ of the pot.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ Where it does not win (yet): the medium spot}
+\begin{frame}{\tagO\ We computed: the medium spot (473 vs 328 combos, 3 bet sizes)}
 \begin{columns}[T]
-\column{0.5\textwidth}
+\column{0.52\textwidth}
 \includegraphics[width=\linewidth]{hybrid_medium.pdf}\\
-{\scriptsize 473 vs 328 combos, 3 bet sizes; 17{,}626 unknowns.}
-\column{0.48\textwidth}
-\begin{itemize}\footnotesize\setlength\itemsep{2pt}
-\item DCFR: $\MedDCFRLongExpl$ after 100{,}000 iterations (\MedDCFRLongTime\,s), $\MedDCFRLongTwoExpl$ after \MedDCFRLongTwoIters\ (\MedDCFRLongTwoTime\,s).
-\item Hybrid ($\rho=10^{-5}$): $\MedHybExpl$ after \MedHybOuter\ prox steps (\MedHybTime\,s). \alert{CFR wins.}
-\item Why: equilibria are far from unique (many hands never matter) $\Rightarrow$ flat directions, $\|(M+\rho I)^{-1}\|\approx 1/\rho$.
-      An interior point with subproblem residual $4\times10^{-6}$ still predicts a wrong active set: the crossover step jumps to residual $0.1$.
-\item Larger $\rho = 3\times10^{-4}$: active-set steps work (2--5 solves per prox step) but each step gains only a few \%.
-      Anderson acceleration of the \emph{proximal} map helps ($8\times10^{-7}$ at 480\,s), then stalls.
+{\scriptsize 17{,}626 unknowns; $A$ has 2.9 M nonzeros. Points = verification rounds.}
+\column{0.46\textwidth}
+\begin{itemize}\footnotesize\setlength\itemsep{3pt}
+\item DCFR: $\MedDCFRAtSuppTime$ at \SuppMedTime\,s; $\MedDCFRLongTwoExpl$ after \MedDCFRLongTwoIters\ iterations (\MedDCFRLongTwoTime\,s).
+\item Ours: DCFR \SuppMedWarm\ its, then \SuppMedRounds\ rounds on a problem with \SuppMedFrac\% of the unknowns
+      (\SuppMedAdded\ actions added back): \alert{$\SuppMedExpl$ in \SuppMedTime\,s}.
+\item Without the restriction the finish \emph{fails} here: $\MedHybExpl$ after \MedHybTime\,s. The full VI is flat
+      ($\|(M+\rho I)^{-1}\|\approx 1/\rho$): an interior point with residual $4\times10^{-6}$ still predicts a wrong active set.
+\item LP (HiGHS): not finished after 25 min.
 \end{itemize}
 \end{columns}
 \note{
-State the limitation plainly. On the medium spot each factorisation of the full system costs about 8\,s (quasi-definite
-$LDL^\top$; 25\,s with plain sparse LU), i.e.\ thousands of DCFR iterations, and the finish does not reach its fast regime: the
-crossover from the interior point lands on a wrong active set (the error is amplified by $\|(M+\rho I)^{-1}\|\approx 1/\rho$), so
-every proximal step falls back to a full interior-point solve. We also tried decreasing $\rho$ gradually from $10^{-3}$: the
-active-set steps track the solution down to $\rho\approx10^{-4}$ and then lose it.\\[3pt]
-A twist worth telling: Anderson acceleration, which did nothing for CFR's nonsmooth map, \emph{does} accelerate the proximal
-map, which is piecewise affine with a slowly changing active set (Leduc at $\rho=10^{-3}$: 20 prox steps become 9; medium at
-$\rho=3\times10^{-4}$: residual $2\times10^{-7}$ after 150 steps instead of $8\times10^{-6}$ after 60). On the medium spot it then stalls,
-and DCFR, given the same 8 minutes, gets to $3.6\times10^{-7}$.\\[3pt]
-So: at realistic sizes CFR remains the right tool for the practical accuracy range, and the second-order finish is a
-small-to-medium-size, high-precision tool --- for now.
+This is the slide that took the longest to earn. The first version of the method --- Newton on the full sequence-form VI --- worked
+on Leduc and the small river and \emph{lost} to DCFR here: the crossover from the interior point kept landing on a wrong active set,
+because the equilibrium set is flat in directions that do not matter (actions never played, positions never reached), and with
+$\rho=10^{-5}$ an error in those directions is amplified by $1/\rho$. Larger $\rho$ made the active-set steps work but the
+outer loop crawl; Anderson acceleration of the proximal map helped (to $8\times10^{-7}$ in 8 minutes) and then stalled.\\[3pt]
+Restricting to the CFR-predicted support and verifying afterwards removes exactly those directions. Result: machine precision in
+about two minutes, at which point DCFR is at a few times $10^{-6}$; DCFR needs 190{,}000 iterations to reach $3.6\times10^{-7}$.
+Starting from 1{,}000 instead of 3{,}000 DCFR iterations gives $\SuppMedOneKExpl$ in \SuppMedOneKTime\,s.
 }
 \end{frame}
 
@@ -943,10 +973,11 @@ small-to-medium-size, high-precision tool --- for now.
 \item \textbf{Structured linear algebra.} Each payoff block is semiseparable $+$ sparse (slide on vectorised CFR):
       products cost $O(n\log n)$, so Newton--Krylov steps would cost a few CFR iterations --- if the shifted-skew
       systems $D + \rho I + \text{skew}$ get a good preconditioner (hierarchical / HSS factorisations of the blocks?).
-\item \textbf{Better-conditioned regularisation.} Regularise only the directions that matter, e.g.\ weighted proximal terms
-      $\|z-z^k\|_W^2$ with $W$ from reach probabilities; or select a particular equilibrium (refinements) to remove the flat directions.
-\item \textbf{Smarter active-set prediction} from CFR regrets (actions with negative regret are out) $\Rightarrow$ smaller systems
-      and a crossover that does not need an interior-point phase.
+\item \textbf{Bigger trees.} Full 1{,}081-combo ranges, more bet sizes, turn $+$ river: the restricted systems still contain
+      dense hand$\times$hand blocks, and factorisation cost grows like their fronts.
+\item \textbf{Smarter support prediction} from CFR regrets $\Rightarrow$ fewer verification rounds, and a crossover that may not
+      need an interior-point phase at all.
+\item \textbf{Inside a real-time agent}: re-solving subgames to high precision, where consistency between solves matters.
 \end{itemize}
 \note{
 These are honest research directions, not results. The first is the one I would bet on: the poker-specific structure that makes
@@ -970,7 +1001,8 @@ solver for the Newton systems would need.
   \item skew-monotone VI $+$ proximal regularisation $\Rightarrow$ uniformly nonsingular Newton matrices (one-line proof)
         and quasi-definite linear algebra;
   \item CFR average $+$ best-response values as a primal--dual warm start;
-  \item tested on Leduc and no-limit river subgames with card removal --- including where it fails.
+  \item restriction to the CFR-predicted support (removes the flat directions) $+$ verification by exact best responses;
+  \item tested on Leduc and no-limit river subgames with card removal.
   \end{itemize}
 \item Early work solved small abstracted games exactly as LPs (Rhode Island hold'em; Gilpin \& Sandholm 2005);
       to our knowledge no CFR-based solver hands over to a second-order method for the last digits.
@@ -986,18 +1018,18 @@ Commercial and research poker solvers we know of (PioSolver, GTO+, Libratus, Dee
 
 % =====================================================================================
 \begin{frame}{Takeaways}
-\begin{enumerate}\setlength\itemsep{6pt}
+\begin{enumerate}\small\setlength\itemsep{3pt}
 \item A poker equilibrium is the solution of a structured bilinear saddle-point problem; the sequence form makes it an LP of
       size linear in the tree.
 \item CFR = regret matching at every information set: a matrix-free, nonsmooth first-order method with a provable $O(T^{-1/2})$
       rate and a much better practical one --- plus numerical tricks (projection, discounting, optimism, Gauss--Seidel).
 \item The solver's output is readable poker: polarised betting, block bets, pot-odds defence (to within 1.5\%).
 \item Read the equilibrium conditions as a \textbf{skew-monotone VI}: proximal point $+$ semismooth (active-set) Newton,
-      started by an interior-point crossover, turns CFR's slow tail into $\sim$20 linear solves and reaches $10^{-13}$ ---
-      on small and mid-sized spots.
-\item At realistic sizes CFR still wins; scaling the finish is a structured linear-algebra and conditioning problem.
+      started by an interior-point crossover, turns CFR's slow tail into a few dozen linear solves.
+\item The catch is \textbf{flatness} of the equilibrium set; restricting to CFR's predicted support and verifying
+      afterwards fixes it: $10^{-12}$ in about two minutes on a 17{,}626-unknown river spot where DCFR is at $10^{-6}$.
 \end{enumerate}
-\vspace{6pt}
+\vspace{2pt}
 {\small Code: \texttt{github.com/dwangnumbers/Poker-Solver} --- solver, benchmarks, figures, these slides.}
 \note{
 End with the invitation: the open problem on the previous slide is a natural one for this club --- a preconditioner for
@@ -1010,6 +1042,7 @@ shifted skew systems whose off-diagonal blocks are semiseparable-plus-sparse.
 \scriptsize
 \begin{itemize}\setlength\itemsep{1pt}
 \item D.~G. Anderson. Iterative procedures for nonlinear integral equations. \emph{J.\ ACM} 12 (1965).
+\item B.~Bo\v{s}ansk\'y, C.~Kiekintveld, V.~Lis\'y, M.~P\v{e}chou\v{c}ek. An exact double-oracle algorithm for zero-sum extensive-form games with imperfect information. \emph{JAIR} 51 (2014).
 \item M.~Bowling, N.~Burch, M.~Johanson, O.~Tammelin. Heads-up limit hold'em poker is solved. \emph{Science} 347 (2015).
 \item N.~Brown, T.~Sandholm. Superhuman AI for heads-up no-limit poker: Libratus beats top professionals. \emph{Science} 359 (2018).
 \item N.~Brown, T.~Sandholm. Solving imperfect-information games via discounted regret minimization. \emph{AAAI} 2019.
@@ -1026,6 +1059,7 @@ shifted skew systems whose off-diagonal blocks are semiseparable-plus-sparse.
 \item D.~Koller, N.~Megiddo, B.~von Stengel. Efficient computation of equilibria for extensive two-person games. \emph{Games Econ.\ Behav.} 14 (1996).
 \item H.~W. Kuhn. A simplified two-person poker. \emph{Contributions to the Theory of Games} I (1950).
 \item F.~J. Luque. Asymptotic convergence analysis of the proximal point algorithm. \emph{SIAM J.\ Control Optim.} 22 (1984).
+\item H.~B. McMahan, G.~J. Gordon, A.~Blum. Planning in the presence of cost functions controlled by an adversary. \emph{ICML} 2003.
 \item S.~Mehrotra. On the implementation of a primal-dual interior point method. \emph{SIAM J.\ Optim.} 2 (1992).
 \item M.~Morav\v{c}\'ik et al. DeepStack: expert-level artificial intelligence in heads-up no-limit poker. \emph{Science} 356 (2017).
 \item L.~Qi, J.~Sun. A nonsmooth version of Newton's method. \emph{Math.\ Program.} 58 (1993).
@@ -1075,7 +1109,7 @@ shifted skew systems whose off-diagonal blocks are semiseparable-plus-sparse.
 \item $a$ measures how far a small residual can be from $Z$: it is large when the equilibrium set is ``flat'' (many
       hands whose actions barely matter).
 \item Fast outer loop needs $\rho \ll 1/a$; but $\|(M+\rho I)^{-1}\|\approx 1/\rho$ then makes each subproblem's
-      active set fragile. Leduc and the small spot: observed factor $\approx10^{-3}$ per step at $\rho=10^{-5}$ (so $a\rho\approx10^{-3}$); on the medium spot no $\rho$ we tried gave both.
+      active set fragile. Leduc and the small spot: observed factor $\approx10^{-3}$ per step at $\rho=10^{-5}$ (so $a\rho\approx10^{-3}$); on the full medium spot no $\rho$ we tried gave both --- the support restriction removes the flat directions instead.
 \end{itemize}
 \note{Backup for questions about the outer loop. The last bullet is the one-sentence diagnosis of the medium spot.}
 \end{frame}

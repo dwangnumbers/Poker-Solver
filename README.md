@@ -7,11 +7,13 @@ The solver has two parts:
 
 1. **Range-vectorised CFR.** CFR, CFR⁺, DCFR and PCFR⁺ run on the public game tree with alternating updates.
    This is the first-order method that every practical poker solver is built on.
-2. **A second-order finish.** We write the equilibrium conditions of the sequence form as a skew-monotone
-   variational inequality and solve it with a proximal-point outer loop. The first subproblem is solved by an
-   interior-point method followed by a crossover. Every later subproblem is solved by semismooth (primal–dual
-   active-set) Newton steps. A few hundred DCFR iterations provide the warm start, both the primal (average
-   strategies) and the dual (information-set values from one best-response pass).
+2. **A second-order finish.** The finish works in four steps:
+   - Take the support predicted by a few thousand DCFR iterations.
+   - Restrict the game to the actions in that support and to the positions both players can reach with them.
+   - Solve the restricted sequence-form equilibrium conditions exactly, as a skew-monotone variational inequality.
+     The solver is a proximal-point loop with an interior-point crossover and semismooth (active-set) Newton steps.
+   - Verify the result in the full game with exact best responses. Add back any profitable pruned action, and
+     repeat.
 
 The talk is in `tex/`: `talk.pdf` has the slides and `talk-notes.pdf` the speaker notes.
 
@@ -39,29 +41,39 @@ its solution set is a polyhedron, generally not a point.
 - After the rows are scaled and half of them change sign, the interior-point systems become symmetric
   **quasi-definite**. An `LDLᵀ` factorisation therefore exists for any fill-reducing ordering (Vanderbei 1995).
 
+- **Restrict, then verify.** The equilibrium set is *flat* in two kinds of direction: actions that are never played,
+  and positions the opponent never lets you reach. Flatness makes the full problem ill-conditioned,
+  `‖(M + ρI)⁻¹‖ ≈ 1/ρ`, so a small residual can still be far from the solution. Restricting to the CFR-predicted
+  support removes those directions. Verification by exact best responses in the full game, a column-generation /
+  double-oracle step, certifies the final exploitability.
+
 CFR does the cheap global phase. The finish does the local phase, where CFR's average converges sublinearly.
 
 ## Results (one CPU core; exploitability in chips)
 
-| game | first-order baseline | hybrid: DCFR warm start → finish | exact LP (HiGHS) |
+| game | first-order baseline | ours: DCFR warm start → restricted second-order finish | exact LP (HiGHS) |
 |---|---|---|---|
-| Leduc hold'em (964 unknowns) | CFR⁺: 9.2e-7 after 50 000 iterations (130 s) | **5.5e-14 in 0.33 s** (100 DCFR its + 19 linear solves) | 0.04 s |
-| NLHE river, 147 vs 139 combos (2 864 unknowns) | DCFR: 5.4e-6 after 30 000 iterations (9 s) | **3.9e-14 in 1.9 s** (1000 DCFR its + 17 linear solves) | 1.6 s |
-| NLHE river, 473 vs 328 combos (17 626 unknowns) | DCFR: **1.8e-6 after 100 000 iterations (282 s); 3.6e-7 after 190 000 (520 s)** | 3.2e-5 after 3 proximal steps (528 s); with ρ = 3e-4 and Anderson acceleration of the proximal map, 8.0e-7 at 480 s, then stalls | not finished after 25 min |
+| Leduc hold'em (964 unknowns) | CFR⁺: 9.2e-7 after 50 000 iterations (130 s) | **6.8e-14 in 0.30 s** (100 DCFR its, 2 rounds) | 0.04 s |
+| NLHE river, 147 vs 139 combos (2 864 unknowns) | DCFR: 5.4e-6 after 30 000 iterations (9 s) | **1.1e-12 in 0.95 s** (1 000 DCFR its, 1 round) | 1.6 s |
+| NLHE river, 473 vs 328 combos (17 626 unknowns) | DCFR: 3.9e-6 at 131 s; 3.6e-7 after 190 000 iterations (520 s) | **2.8e-12 in 131 s** (3 000 DCFR its, 3 rounds, 34% of the unknowns) | not finished after 25 min |
 
-**Where it wins.** On small and mid-sized subgames the hybrid reaches machine-precision equilibria where CFR-type
-methods would need millions of iterations. It also identifies the exact support of the equilibrium.
+On the larger spot, the finish *without* the restriction loses to DCFR. It gets 3.2e-5 after 528 s because the
+interior point predicts a wrong active set in the flat directions. Anderson acceleration of the proximal map helps
+(8.0e-7 at 480 s with ρ = 3e-4) and then stalls. The restriction is what makes the method work at this size.
 
-**Where it does not.** On the larger river spot CFR wins. The equilibrium there is far from unique, so the
-regularised subproblems are ill-conditioned: `‖(M + ρI)⁻¹‖ ≈ 1/ρ`. The interior point's prediction of the active
-set is then wrong, the crossover fails, and every proximal step falls back to a full interior-point solve. Each
-factorisation takes about 8 s, which is thousands of CFR iterations. Making the finish scale is an open
-linear-algebra and conditioning problem; the payoff blocks are semiseparable plus a sparse correction. See the last
-slides of the talk.
+**Where it wins.** It reaches machine-precision equilibria, with a certificate, in seconds to minutes. CFR-type
+methods would need millions of iterations for the same accuracy. It also identifies the exact support of the
+equilibrium.
+
+**Limits.** Each Newton-type step is a sparse factorisation of a matrix with dense hand-by-hand payoff blocks. For
+the usual practical target of about 0.1% of the pot, DCFR alone is enough. Full 1 081-combo ranges and multi-street
+trees would need structured linear algebra; the payoff blocks are semiseparable plus a sparse correction. See the
+last slides of the talk.
 
 **Closest prior work.** Yang, Gao, Lin & Kroer (arXiv:2512.12910, 2025) proposed a semismooth Newton method for
 *matrix* games, warm-started by PRM⁺. This repository works directly on the *sequence form* of extensive-form
-poker and uses a different regularisation and dual warm start.
+poker and uses a different regularisation and dual warm start. It also adds the support restriction with
+verification; the verification is in the spirit of double-oracle methods (McMahan et al. 2003; Bošanský et al. 2014).
 
 ## Layout
 
@@ -69,8 +81,9 @@ poker and uses a different regularisation and dual warm start.
 solver/
   games.py        Kuhn, Leduc, heads-up no-limit river builder (7-card evaluator, card removal, range notation)
   cfr.py          range-vectorised public-tree CFR / CFR+ / DCFR / PCFR+, best response, exploitability
+  support.py      the full method: predicted support -> restricted exact solve -> verification rounds
   seqform.py      sequence form (E, F, A), dual estimates, Newton-type finishes:
-                    ProxIPMPDAS           <- the method of the talk (prox point; IPM + crossover; active-set Newton)
+                    ProxIPMPDAS           <- exact solver used by support.py (prox point; IPM + crossover; active-set Newton)
                     ProxNewtonQD          prox point + Fischer-Burmeister semismooth Newton, quasi-definite LDLᵀ
                     ProxNewtonFB(Reduced) same iterates as ProxNewtonQD, unsymmetric sparse LU
                     ProxAAPDAS            Anderson-accelerated proximal map (helps the outer loop; stalls on the medium spot)
@@ -80,7 +93,7 @@ solver/
   lp.py           exact sequence-form LP via HiGHS (reference)
   aa.py, maps.py  Anderson acceleration of the CFR+ map (negative result)
   extrap.py       reduced-rank extrapolation of CFR averages (negative result)
-  demo.py         two-second live demo (small river spot)
+  demo.py         one-second live demo (small river spot)
   test_solver.py  sanity tests: hand evaluator, ranges, Kuhn value -1/18, finish = LP value on Leduc and a river spot
   bench_*.py      benchmarks -> results/*.json
   fig_*.py        figures    -> figs/*.pdf
@@ -100,7 +113,10 @@ python3 bench_baselines.py leduc 5000                  # CFR, CFR+, DCFR, PCFR+ 
 python3 bench_baselines.py leduc 50000 cfr+,dcfr _long
 python3 bench_river.py small 30000                     # baselines on the small river spot
 python3 bench_river.py medium 5000
-python3 bench_newton.py leduc 100 300 1000             # hybrid solver
+python3 bench_support.py leduc 1e-3 100 300 1000       # the method of the talk
+python3 bench_support.py small 1e-3 300 1000 3000
+python3 bench_support.py medium 1e-3 1000 3000          # ~2.5 min each
+python3 bench_newton.py leduc 100 300 1000             # finish on the full (unrestricted) VI
 python3 bench_newton.py small 300 1000 3000
 python3 bench_newton.py medium 1000                    # slow: minutes per proximal step (our run was stopped after 3); CFR wins here
 python3 bench_river.py medium 100000 dcfr,cfr+ _long
@@ -111,19 +127,22 @@ cd ../tex && pdflatex talk.tex && pdflatex talk.tex
 pdflatex -jobname=talk-notes "\def\notesmode{1}\input{talk.tex}"
 ```
 
-Live demo for the talk (about 2 seconds): `python3 solver/demo.py` solves the small river spot with DCFR and the
-finish, printing exploitability after every step and the big blind's strategy for a few hands.
+Live demo for the talk (about 1 second): `python3 solver/demo.py` solves the small river spot with DCFR and then
+the finish. It prints the exploitability along the way and the big blind's strategy for a few hands.
 
 A minimal use of the solver:
 
 ```python
 from games import river, BB_CALL, BTN_OPEN
 from cfr import solve
-from seqform import SeqForm, ProxIPMPDAS
+from seqform import SeqForm
+from support import solve_support
 
 g = river(board=('Ks', '7d', '2c', 'Th', '4s'), ranges=[BB_CALL, BTN_OPEN])
-T, R, S, hist = solve(g, 'dcfr', iters=1000, log_every=1000)       # first-order phase
-sigma, z, finish_hist = ProxIPMPDAS(SeqForm(g)).solve(T.normalize_avg(S), rho=1e-5)   # second-order finish
+T, R, S, hist = solve(g, 'dcfr', iters=3000, log_every=3000)        # first-order phase
+sf = SeqForm(g)
+sigma, rounds = solve_support(sf, T.normalize_avg(S), tau=1e-3)      # restrict, solve exactly, verify
+print(sf.T.exploitability(sigma))                                     # ~1e-12 chips
 ```
 
 ## References
@@ -133,4 +152,5 @@ Tammelin 2014 (CFR⁺), Brown & Sandholm 2019 (DCFR), Farina, Kroer & Sandholm 2
 von Stengel 1996 (sequence form), Rockafellar 1976 (proximal point), Hintermüller, Ito & Kunisch 2002
 (the active-set method as semismooth Newton), Mehrotra 1992 (predictor–corrector interior point), Fischer 1992 and
 De Luca, Facchinei & Kanzow 1996 (Fischer–Burmeister semismooth Newton), Vanderbei 1995 (quasi-definite
-matrices), and Johanson et al. 2011 (fast best response).
+matrices), McMahan, Gordon & Blum 2003 and Bošanský et al. 2014 (double oracle), and Johanson et al. 2011
+(fast best response).

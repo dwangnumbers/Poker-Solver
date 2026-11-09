@@ -842,7 +842,9 @@ class ProxIPMPDAS(ProxIPMNewton):
         res = float(np.linalg.norm(psi))
         return z, iters, res < 1e-11, res
 
-    def solve(self, sigma, rho=1e-5, outer=50, tol=1e-13, z0=None, track=True, inner_iters=50, verbose=False):
+    def solve(self, sigma, rho=1e-5, outer=50, tol=1e-13, z0=None, track=True, inner_iters=50, verbose=False,
+              first='ipm'):
+        """first='pdas': try active-set steps already in the first proximal step (for a near-exact warm start)."""
         import time as _time
         t0 = _time.time()
         z = self.warm_start(sigma) if z0 is None else z0.copy()
@@ -858,7 +860,7 @@ class ProxIPMPDAS(ProxIPMNewton):
             t1 = _time.time()
             zk = z.copy()
             rk = rho(k) if callable(rho) else rho
-            zt, ni, ok, res = (z, 0, False, np.inf) if k == 1 else self.pdas(zk, rk, z.copy())
+            zt, ni, ok, res = (z, 0, False, np.inf) if (k == 1 and first == 'ipm') else self.pdas(zk, rk, z.copy())
             used = 'pdas'
             if not ok:
                 zi, nip = self.ipm(zk, rk, z.copy())

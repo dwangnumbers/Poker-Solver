@@ -1,5 +1,6 @@
 """Write ../tex/numbers.tex: every computed number quoted in the slides comes from ../results."""
 import json, os, pickle
+import numpy as np
 R = '../results/'
 def e(v, d=1):
     m, x = f'{v:.{d}e}'.split('e')
@@ -62,6 +63,32 @@ for name, p, s_, d, m in mdf:
 rows.sort(key=lambda r: (-r[0], r[1]))
 open('../tex/mdf_table.tex', 'w').write('\\begin{tabular}{@{}llccc@{}}\n\\toprule\ndefender & line & $s$ & defends & MDF \\\\ \\midrule\n'
     + '\n'.join(r[2] for r in rows) + '\n\\bottomrule\n\\end{tabular}\n')
+
+# support-restricted finish (the final method)
+def supp(f, warm):
+    for r in json.load(open(R + f)):
+        if r['warm'] == warm:
+            return r
+for nm, f, w in (('Leduc', 'support_leduc.json', 100), ('Small', 'support_small.json', 1000), ('Med', 'support_medium.json', 3000)):
+    r = supp(f, w)
+    out['Supp' + nm + 'Time'] = f"{r['points'][-1][1]:.2f}" if nm != 'Med' else f"{r['points'][-1][1]:.0f}"
+    out['Supp' + nm + 'Expl'] = e(r['points'][-1][2])
+    out['Supp' + nm + 'Rounds'] = str(len(r['rounds']))
+    out['Supp' + nm + 'Warm'] = f"{w:,}".replace(',', '{,}')
+    tot = sum(i['solves'] for i in r['rounds'])
+    out['Supp' + nm + 'Solves'] = str(tot)
+P0 = json.load(open(R + 'support_medium.json'))
+r = supp('support_medium.json', 3000)
+full = 17626
+out['SuppMedFrac'] = f"{100 * r['rounds'][-1]['n_vars'] / full:.0f}"
+out['SuppMedAdded'] = str(sum(i['added'] for i in r['rounds']))
+t_med = r['points'][-1][1]
+dc = np.array(json.load(open(R + 'baselines_river_medium_combined.json'))['dcfr'])
+k = int(np.argmin(np.abs(dc[:, 1] - t_med)))
+out['MedDCFRAtSuppTime'] = e(dc[k, 2]); out['MedDCFRAtSuppIters'] = f"{int(dc[k, 0]):,}".replace(',', '{,}')
+r1 = supp('support_medium.json', 1000)
+out['SuppMedOneKTime'] = f"{r1['points'][-1][1]:.0f}"; out['SuppMedOneKExpl'] = e(r1['points'][-1][2])
+
 with open('../tex/numbers.tex', 'w') as f:
     for k, v in out.items():
         f.write(f'\\newcommand{{\\{k}}}{{{v}}}\n')
