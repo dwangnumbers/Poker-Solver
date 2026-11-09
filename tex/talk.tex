@@ -968,20 +968,25 @@ Starting from 1{,}000 instead of 3{,}000 DCFR iterations gives $\SuppMedOneKExpl
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ How the finish could scale (open problems)}
-\begin{itemize}\setlength\itemsep{6pt}
+\begin{frame}{\tagO\ Where it stops winning: full ranges, and open problems}
+\begin{block}{We computed: full 1{,}081-combo ranges for both players (47{,}568 unknowns, $A$: 22.4 M nonzeros)}
+\small Restricted problem 43\% of the unknowns, one factorisation $\approx$10\,s. Verification round 1 alone: 201 linear solves,
+\alert{50 min}, and 24 actions to add back. DCFR in 10 min: $9.5\times10^{-6}$. \textbf{Here CFR wins.}
+\end{block}
+\begin{itemize}\small\setlength\itemsep{4pt}
 \item \textbf{Structured linear algebra.} Each payoff block is semiseparable $+$ sparse (slide on vectorised CFR):
       products cost $O(n\log n)$, so Newton--Krylov steps would cost a few CFR iterations --- if the shifted-skew
       systems $D + \rho I + \text{skew}$ get a good preconditioner (hierarchical / HSS factorisations of the blocks?).
-\item \textbf{Bigger trees.} Full 1{,}081-combo ranges, more bet sizes, turn $+$ river: the restricted systems still contain
-      dense hand$\times$hand blocks, and factorisation cost grows like their fronts.
-\item \textbf{Smarter support prediction} from CFR regrets $\Rightarrow$ fewer verification rounds, and a crossover that may not
-      need an interior-point phase at all.
+\item \textbf{Smarter support prediction} from CFR regrets $\Rightarrow$ fewer verification rounds and smaller systems.
 \item \textbf{Inside a real-time agent}: re-solving subgames to high precision, where consistency between solves matters.
 \end{itemize}
 \note{
-These are honest research directions, not results. The first is the one I would bet on: the poker-specific structure that makes
-CFR fast (sorting, prefix sums, card-removal corrections) is exactly the structure a fast direct or preconditioned iterative
+The full-range run is the honest boundary of the method as implemented. Restriction still removes more than half of the
+unknowns, but each factorisation of the remaining 20{,}000-unknown system takes about 10 seconds because the payoff blocks between
+the hands that remain in play are dense, and the first round needed 201 solves (the interior-point phase plus the proximal steps).
+DCFR does 40{,}000 iterations in the time of one round.\\[3pt]
+The research directions are the natural ones for this club. The first is the one I would bet on: the poker-specific structure that
+makes CFR fast (sorting, prefix sums, card-removal corrections) is exactly the structure a fast direct or preconditioned iterative
 solver for the Newton systems would need.
 }
 \end{frame}
@@ -1028,6 +1033,7 @@ Commercial and research poker solvers we know of (PioSolver, GTO+, Libratus, Dee
       started by an interior-point crossover, turns CFR's slow tail into a few dozen linear solves.
 \item The catch is \textbf{flatness} of the equilibrium set; restricting to CFR's predicted support and verifying
       afterwards fixes it: $10^{-12}$ in about two minutes on a 17{,}626-unknown river spot where DCFR is at $10^{-6}$.
+      With full ranges the linear algebra becomes the bottleneck and CFR wins again.
 \end{enumerate}
 \vspace{2pt}
 {\small Code: \texttt{github.com/dwangnumbers/Poker-Solver} --- solver, benchmarks, figures, these slides.}

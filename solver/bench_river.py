@@ -10,7 +10,7 @@ if __name__ == '__main__':
     which = sys.argv[1]; iters = int(sys.argv[2])
     algos = sys.argv[3].split(',') if len(sys.argv) > 3 else ['cfr+', 'dcfr', 'pcfr+']
     tag = sys.argv[4] if len(sys.argv) > 4 else ''
-    g = river(**(SMALL if which == 'small' else MEDIUM))
+    g = river(**SMALL) if which == 'small' else (river() if which == 'full' else river(**MEDIUM))
     out = {}
     for algo in algos:
         t0 = time.time(); rec = []

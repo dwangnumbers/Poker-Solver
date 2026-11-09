@@ -17,7 +17,7 @@ The solver has two parts:
 
 The talk is in `tex/`: `talk.pdf` has the slides and `talk-notes.pdf` the speaker notes.
 
-## The idea in one paragraph
+## The idea
 
 With realisation plans `x, y`, information-set values `p, q`, and the sequence-form matrices `E, F, A`, a Nash
 equilibrium is a solution of
@@ -56,6 +56,7 @@ CFR does the cheap global phase. The finish does the local phase, where CFR's av
 | Leduc hold'em (964 unknowns) | CFR⁺: 9.2e-7 after 50 000 iterations (130 s) | **6.8e-14 in 0.30 s** (100 DCFR its, 2 rounds) | 0.04 s |
 | NLHE river, 147 vs 139 combos (2 864 unknowns) | DCFR: 5.4e-6 after 30 000 iterations (9 s) | **1.1e-12 in 0.95 s** (1 000 DCFR its, 1 round) | 1.6 s |
 | NLHE river, 473 vs 328 combos (17 626 unknowns) | DCFR: 3.9e-6 at 131 s; 3.6e-7 after 190 000 iterations (520 s) | **2.8e-12 in 131 s** (3 000 DCFR its, 3 rounds, 34% of the unknowns) | not finished after 25 min |
+| NLHE river, full 1 081 vs 1 081 combos (47 568 unknowns) | **DCFR: 9.5e-6 after 40 000 iterations (574 s)** | round 1 alone: 201 linear solves of a 20 263-unknown system, 50 min (CFR wins) | – |
 
 On the larger spot, the finish *without* the restriction loses to DCFR. It gets 3.2e-5 after 528 s because the
 interior point predicts a wrong active set in the flat directions. Anderson acceleration of the proximal map helps
@@ -65,10 +66,10 @@ interior point predicts a wrong active set in the flat directions. Anderson acce
 methods would need millions of iterations for the same accuracy. It also identifies the exact support of the
 equilibrium.
 
-**Limits.** Each Newton-type step is a sparse factorisation of a matrix with dense hand-by-hand payoff blocks. For
-the usual practical target of about 0.1% of the pot, DCFR alone is enough. Full 1 081-combo ranges and multi-street
-trees would need structured linear algebra; the payoff blocks are semiseparable plus a sparse correction. See the
-last slides of the talk.
+**Limits.** Each Newton-type step is a sparse factorisation of a matrix with dense hand-by-hand payoff blocks. With
+full 1 081-combo ranges one factorisation takes about 10 s, and CFR wins. For the usual practical target of about
+0.1% of the pot, DCFR alone is enough. Full ranges and multi-street trees would need structured linear algebra; the
+payoff blocks are semiseparable plus a sparse correction. See the last slides of the talk.
 
 **Closest prior work.** Yang, Gao, Lin & Kroer (arXiv:2512.12910, 2025) proposed a semismooth Newton method for
 *matrix* games, warm-started by PRM⁺. This repository works directly on the *sequence form* of extensive-form
@@ -116,12 +117,15 @@ python3 bench_river.py medium 5000
 python3 bench_support.py leduc 1e-3 100 300 1000       # the method of the talk
 python3 bench_support.py small 1e-3 300 1000 3000
 python3 bench_support.py medium 1e-3 1000 3000          # ~2.5 min each
+python3 bench_support.py full 1e-3 3000                 # slow: ~50 min per verification round
+python3 bench_river.py full 40000 dcfr
 python3 bench_newton.py leduc 100 300 1000             # finish on the full (unrestricted) VI
 python3 bench_newton.py small 300 1000 3000
 python3 bench_newton.py medium 1000                    # slow: minutes per proximal step (our run was stopped after 3); CFR wins here
 python3 bench_river.py medium 100000 dcfr,cfr+ _long
 python3 solve_spot.py 5000                             # strategy of the medium spot for the grids
-python3 fig_conv.py; python3 fig_poker.py; python3 fig_newton.py; python3 fig_rm.py
+python3 bench_river.py medium 190000 dcfr _long2
+python3 fig_conv.py; python3 fig_poker.py; python3 fig_newton.py; python3 fig_rm.py; python3 fig_ranges.py
 python3 gen_numbers.py
 cd ../tex && pdflatex talk.tex && pdflatex talk.tex
 pdflatex -jobname=talk-notes "\def\notesmode{1}\input{talk.tex}"
