@@ -408,17 +408,122 @@ class ProxNewton:
         return z, it + 1
 
     def solve(self, sigma, rho=1e-2, outer=50, tol=1e-13, z0=None, track=True, inner_iters=50, verbose=False):
+        import time as _time
+        t0 = _time.time()
         z = self.warm_start(sigma) if z0 is None else z0.copy()
         r = np.linalg.norm(self.residual(z))
+        self.clock = [_time.time() - t0]          # compute time only (exploitability evaluation excluded)
         hist = [(0, 0, r, self.sf.T.exploitability(self.to_sigma(z, sigma)) if track else None)]
         newton = 0
         for k in range(1, outer + 1):
             if r < tol:
                 break
-            z, ni = self.inner(z.copy(), rho, z.copy(), iters=inner_iters)
+            t1 = _time.time()
+            rk = rho(k) if callable(rho) else rho
+            z, ni = self.inner(z.copy(), rk, z.copy(), iters=inner_iters)
             newton += ni
             r = np.linalg.norm(self.residual(z))
+            self.clock.append(self.clock[-1] + _time.time() - t1)
             hist.append((k, newton, r, self.sf.T.exploitability(self.to_sigma(z, sigma)) if track else None))
             if verbose:
                 print(hist[-1], flush=True)
         return self.to_sigma(z, sigma), z, hist
+
+
+class ProxNewtonFB(ProxNewton):
+    """As ProxNewton, but each strongly monotone subproblem is solved by the semismooth Newton method of
+    De Luca-Facchinei-Kanzow on the Fischer-Burmeister reformulation
+        phi(a, b) = a + b - sqrt(a^2 + b^2)       (phi = 0  <=>  a >= 0, b >= 0, ab = 0),
+    whose merit 1/2 ||Phi||^2 is C^1, so an Armijo line search globalises Newton.  For a strongly monotone
+    LCP every stationary point of the merit is the solution and the Newton matrices are uniformly
+    nonsingular, so convergence is global and locally quadratic.  'scale' balances the two arguments."""
+
+    def __init__(self, sf, scale=1.0):
+        super().__init__(sf)
+        self.c = scale
+
+    def fb(self, z, Mr, br, jac=True):
+        nb, c = self.nb, self.c
+        w = Mr @ z + br
+        a, b = z[:nb], c * w[:nb]
+        r = np.sqrt(a * a + b * b)
+        Phi = np.concatenate([a + b - r, w[nb:]])
+        if not jac:
+            return Phi
+        rz = r == 0
+        rs = np.where(rz, 1.0, r)
+        da = np.where(rz, 1 - 1 / np.sqrt(2), 1 - a / rs)
+        db = np.where(rz, 1 - 1 / np.sqrt(2), 1 - b / rs)
+        Da = sp.diags(np.concatenate([da, np.zeros(self.N - nb)]))
+        Db = sp.diags(np.concatenate([c * db, np.ones(self.N - nb)]))
+        return Phi, (Da @ self.I + Db @ Mr).tocsc()
+
+    def inner(self, zk, rho, z, iters=50, tol=1e-14):
+        Mr = (self.M + rho * self.I).tocsr()
+        br = self.b - rho * zk
+        self.steps = getattr(self, 'steps', [])
+        for it in range(iters):
+            Phi, J = self.fb(z, Mr, br)
+            th = 0.5 * Phi @ Phi
+            if np.sqrt(2 * th) < tol:
+                break
+            d = spla.spsolve(J, -Phi)
+            t = 1.0
+            while t > 1e-10:
+                Pn = self.fb(z + t * d, Mr, br, jac=False)
+                if 0.5 * Pn @ Pn <= (1 - 2e-4 * t) * th:
+                    break
+                t *= 0.5
+            z = z + t * d
+            self.steps.append(t)
+        return z, it + 1
+
+
+class ProxNewtonFBReduced(ProxNewtonFB):
+    """ProxNewtonFB with the Newton system reduced to the 'undecided' coordinates.  Rows whose
+    Fischer-Burmeister derivative w.r.t. the slack is negligible (x_i = 0 clearly optimal: the sequence is
+    dropped from the support) are identity rows; eliminating them leaves a system whose size is the
+    support of the current iterate plus the number of information sets.  Poker equilibria are nearly
+    pure, so this is far smaller than the full system (and the dense hand-by-hand payoff blocks that
+    cause fill-in mostly disappear)."""
+    drop = 1e-9
+
+    def inner(self, zk, rho, z, iters=50, tol=1e-14):
+        Mr = (self.M + rho * self.I).tocsr()
+        br = self.b - rho * zk
+        nb, c, N = self.nb, self.c, self.N
+        self.steps = getattr(self, 'steps', []); self.sizes = getattr(self, 'sizes', [])
+        for it in range(iters):
+            w = Mr @ z + br
+            a, b = z[:nb], c * w[:nb]
+            r = np.sqrt(a * a + b * b)
+            Phi = np.concatenate([a + b - r, w[nb:]])
+            th = 0.5 * Phi @ Phi
+            self.inner_res = getattr(self, 'inner_res', []); self.inner_res.append(float(np.sqrt(2 * th)))
+            if np.sqrt(2 * th) < tol:
+                self.inner_res.append(None)
+                break
+            rz = r == 0; rs = np.where(rz, 1.0, r)
+            da = np.where(rz, 1 - 1 / np.sqrt(2), 1 - a / rs)
+            db = np.where(rz, 1 - 1 / np.sqrt(2), 1 - b / rs)
+            da = np.concatenate([da, np.zeros(N - nb)]); db = np.concatenate([c * db, np.ones(N - nb)])
+            Aset = db < self.drop                       # identity rows
+            Fset = ~Aset
+            d = np.zeros(N)
+            d[Aset] = -Phi[Aset] / da[Aset]
+            MF = Mr[Fset]
+            JFF = (sp.diags(da[Fset]) @ self.I[Fset][:, Fset] + sp.diags(db[Fset]) @ MF[:, Fset]).tocsc()
+            rhs = -Phi[Fset] - db[Fset] * (MF[:, Aset] @ d[Aset])
+            d[Fset] = spla.spsolve(JFF, rhs)
+            self.sizes.append(int(Fset.sum()))
+            t = 1.0
+            while t > 1e-10:
+                zn = z + t * d; wn = Mr @ zn + br
+                an, bn = zn[:nb], c * wn[:nb]
+                Pn = np.concatenate([an + bn - np.sqrt(an * an + bn * bn), wn[nb:]])
+                if 0.5 * Pn @ Pn <= (1 - 2e-4 * t) * th:
+                    break
+                t *= 0.5
+            z = zn
+            self.steps.append(t)
+        return z, it + 1

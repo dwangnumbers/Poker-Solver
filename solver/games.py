@@ -201,6 +201,46 @@ def eval7(cards):
     return (0,) + tuple(ranks[:5])
 
 
+def expand_range(spec):
+    """Standard range notation -> set of hand classes ('AKs', 'QJo', 'TT').
+    Tokens: 'TT', 'TT+', 'AKs', 'A2s+', 'KTo+', '98o'; prefix '-' to remove."""
+    R = RANKS
+    out = set()
+    for tok in [t.strip() for t in spec.split(',') if t.strip()]:
+        neg = tok.startswith('-'); tok = tok.lstrip('-')
+        plus = tok.endswith('+'); tok = tok.rstrip('+')
+        cls = set()
+        if len(tok) == 2:                               # pair
+            lo = R.index(tok[0])
+            for r in (range(lo, 13) if plus else [lo]):
+                cls.add(R[r] * 2)
+        else:
+            hi, lo, kind = R.index(tok[0]), R.index(tok[1]), tok[2]
+            for r in (range(lo, hi) if plus else [lo]):
+                cls.add(R[hi] + R[r] + kind)
+        out = out - cls if neg else out | cls
+    return out
+
+
+def hand_class(h):
+    a, b = sorted(h, reverse=True)
+    ra, rb = RANKS[a // 4], RANKS[b // 4]
+    if ra == rb:
+        return ra + rb
+    return ra + rb + ('s' if a % 4 == b % 4 else 'o')
+
+
+def weights_from(spec, hands):
+    cls = expand_range(spec)
+    return np.array([1.0 if hand_class(h) in cls else 0.0 for h in hands])
+
+
+# illustrative single-raised-pot ranges (button open vs big-blind call), flop and turn checked through
+BB_CALL = ('22+,A2s+,K2s+,Q4s+,J6s+,T6s+,96s+,85s+,75s+,64s+,53s+,43s,A2o+,K8o+,Q9o+,J9o+,T8o+,98o,87o,'
+           '-QQ+,-AKs,-AKo,-A5s')
+BTN_OPEN = '22+,A2s+,K5s+,Q8s+,J8s+,T7s+,97s+,86s+,75s+,65s,54s,A7o+,K9o+,QTo+,JTo'
+
+
 def river(board=('Ks', '7d', '2c', 'Th', '4s'), pot=100.0, stack=100.0,
           bet_sizes=(0.33, 0.75, 1.5), raise_sizes=(1.0,), max_raises=2,
           ranges=None, allin_threshold=0.67):
@@ -220,7 +260,14 @@ def river(board=('Ks', '7d', '2c', 'Th', '4s'), pot=100.0, stack=100.0,
     bases = {'norm': C, 'fold': C, 'sd': S}
     if ranges is None:
         ranges = [np.ones(nh), np.ones(nh)]
-    ranges = [np.asarray(r, float) for r in ranges]
+    ranges = [weights_from(r, hands) if isinstance(r, str) else np.asarray(r, float) for r in ranges]
+    # drop hands with zero weight: each player keeps its own hand list
+    keep = [np.nonzero(r > 0)[0] for r in ranges]
+    C = C[np.ix_(keep[0], keep[1])]; S = S[np.ix_(keep[0], keep[1])]
+    bases = {'norm': C, 'fold': C, 'sd': S}
+    ranges = [ranges[p][keep[p]] for p in (0, 1)]
+    phands = [[hands[i] for i in keep[p]] for p in (0, 1)]
+    pstrength = [strength[keep[p]] for p in (0, 1)]
 
     def node(player, contrib, n_raises, facing):
         """contrib[i] = chips player i has put in on this river.  pot = initial pot."""
@@ -257,8 +304,8 @@ def river(board=('Ks', '7d', '2c', 'Th', '4s'), pot=100.0, stack=100.0,
                     name=f'p{player}c{contrib[0]:.0f}-{contrib[1]:.0f}')
 
     root = node(0, [0.0, 0.0], 0, False)
-    labels = [card_str(a) + card_str(b) for a, b in hands]
-    g = Game(root, [nh, nh], bases, ranges, f'River {" ".join(board)}', labels)
-    g.hands, g.strength, g.board = hands, strength, board
+    labels = [[card_str(b) + card_str(a) for a, b in phands[p]] for p in (0, 1)]
+    g = Game(root, [len(keep[0]), len(keep[1])], bases, ranges, f'River {" ".join(board)}', labels)
+    g.hands, g.strength, g.board = phands, pstrength, board
     g.pot = pot
     return g
