@@ -1,0 +1,22 @@
+River Ks 7d 2c Th 4s: big blind 147 combos vs button 139 combos, pot 100, stacks 100
+  DCFR     1 iterations   exploitability 2.51e+01 chips
+  DCFR   250 iterations   exploitability 9.64e-03 chips
+  DCFR   500 iterations   exploitability 2.35e-03 chips
+  DCFR   750 iterations   exploitability 1.16e-03 chips
+  DCFR  1000 iterations   exploitability 5.34e-04 chips
+  prox step 1  (ipm+pdas 10 linear solves)   exploitability 1.76e-05 chips
+  prox step 2  (pdas      2 linear solves)   exploitability 1.58e-07 chips
+  prox step 3  (pdas      2 linear solves)   exploitability 3.57e-09 chips
+  prox step 4  (pdas      1 linear solves)   exploitability 3.67e-11 chips
+  prox step 5  (pdas      1 linear solves)   exploitability 1.08e-12 chips
+  prox step 6  (pdas      1 linear solves)   exploitability 3.85e-14 chips
+DCFR 0.3s, finish 1.5s;  game value for the big blind: +0.3122492839 chips
+
+Big blind, first action  (check, bet0.75, allin):
+  TcTd: check 100.0%  bet0.75   0.0%  allin   0.0%
+  7h7c: check  68.4%  bet0.75   0.0%  allin  31.6%
+  AhKd: check   0.0%  bet0.75 100.0%  allin   0.0%
+  KhQh: check 100.0%  bet0.75   0.0%  allin   0.0%
+  AsQs: check 100.0%  bet0.75   0.0%  allin   0.0%
+  JcTc: check 100.0%  bet0.75   0.0%  allin   0.0%
+  QsJs: check   0.0%  bet0.75  98.0%  allin   2.0%

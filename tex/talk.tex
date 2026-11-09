@@ -20,6 +20,7 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,shapes.geometric,fit,backgrounds,decorations.pathreplacing}
 \usepackage{graphicx}
+\usepackage{fancyvrb}
 \graphicspath{{../figs/}}
 \input{numbers.tex}
 
@@ -80,9 +81,10 @@
 \begin{frame}
   \titlepage
 \note{
-\textbf{Timing plan (60 min).} Hook \& rules 6 $\cdot$ Games, equilibria, sequence form 12 $\cdot$
-Regret minimisation and CFR 14 $\cdot$ What solutions look like 6 $\cdot$ Our method 14 $\cdot$ Results, limits, wrap-up 8.\\
-If running late, skip: ``Kuhn poker'', ``Modern CFR = numerical tricks'' (one sentence), ``Attempt 1: Anderson'' (one sentence), backup slides.\\[4pt]
+\textbf{Timing plan (60 min, 38 slides).} Hook \& rules 6 $\cdot$ Games, equilibria, sequence form 11 $\cdot$
+Regret minimisation and CFR 13 $\cdot$ What solutions look like 6 $\cdot$ The new method 13 $\cdot$ Demo, results, limits, wrap-up 11.\\
+If running late, skip: ``Kuhn poker'', ``Modern CFR = numerical tricks'' (one sentence), ``Attempt 1: Anderson'' (one sentence),
+``The linear algebra'' (one sentence: quasi-definite, so any ordering works), backup slides.\\[4pt]
 Opening line: ``Ten years ago the best poker players in the world lost to programs whose core is a few lines of
 arithmetic repeated a few billion times. This talk is about that arithmetic, read as numerical analysis --- and about
 what a numerical analyst can add to it.''\\[4pt]
@@ -798,6 +800,18 @@ The VI residual of the original problem is plotted after every linear solve. The
 $\min(x,w)$ sense only because it is interior; the crossover step lands on the exact solution of the first \emph{regularised}
 subproblem, whose residual is $\rho\|z^1-z^0\|$ --- hence the jump. From then on each proximal step is solved exactly in one to three
 active-set steps.
+}
+\end{frame}
+
+% =====================================================================================
+\begin{frame}[fragile]{\tagP\tagO\ Live demo: \texttt{python3 solver/demo.py} (2 seconds)}
+\VerbatimInput[fontsize=\fontsize{7.3}{8.4}\selectfont,frame=single,rulecolor=\color{lightgray}]{../results/demo_output.txt}
+\note{
+Run it live if the room allows (Python 3 with numpy, scipy, qdldl). The output above is a captured run. Points to make:
+DCFR gains a digit per few hundred iterations; the first prox step (interior point $+$ crossover, about ten linear solves) gains
+more than an order of magnitude, and each later prox step costs one or two linear solves and gains about two digits.\\[3pt]
+Poker reading: QJs (no pair, no showdown value) is the bluff --- it bets; AK bets for thin value/protection; sets of tens check
+(to check-raise); 77 mixes check and jam --- an exact mixed strategy, which the Newton finish computes to machine precision.
 }
 \end{frame}
 
