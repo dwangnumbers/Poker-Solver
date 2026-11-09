@@ -260,7 +260,7 @@ complementary slackness in the LP we are about to write down. Mixing happens exa
 \small
 prox-Newton output: $\alpha = 0.198$, K bets $0.593 = 3\alpha$\\
 value $-0.0555\ldots = -1/18$\\
-exploitability $1.4\times10^{-16}$
+exploitability $1.1\times10^{-16}$
 \end{block}
 \vspace{4pt}
 {\small The equilibrium set is a \textbf{polytope}, not a point: any method must cope with
@@ -832,8 +832,8 @@ Exploitability in chips with pot 100: $10^{-6}$ chips is $10^{-8}$ of the pot.
 \begin{itemize}\small\setlength\itemsep{3pt}
 \item DCFR: $\MedDCFRLongExpl$ after 100{,}000 iterations (\MedDCFRLongTime\,s).
 \item Hybrid: $\MedHybExpl$ after \MedHybOuter\ prox steps (\MedHybTime\,s). \alert{CFR wins.}
-\item Why: equilibria are far from unique (many hands never matter) $\Rightarrow$ flat directions; with $\rho=10^{-5}$ a residual of
-      $10^{-6}$ can sit $0.1$ away from the subproblem's solution, so the crossover's active set is wrong.
+\item Why: equilibria are far from unique (many hands never matter) $\Rightarrow$ flat directions, $\|(M+\rho I)^{-1}\|\approx 1/\rho$.
+      An interior point with subproblem residual $4\times10^{-6}$ still predicts a wrong active set: the crossover step jumps to residual $0.1$.
 \item Larger $\rho = 10^{-3}$: crossover works (3--5 solves per step) but each prox step gains only $\sim$5\%.
 \end{itemize}
 \end{columns}
@@ -868,7 +868,7 @@ solver for the Newton systems would need.
 
 % =====================================================================================
 \begin{frame}{\tagO\ What is new here, and what is not}
-\begin{itemize}\setlength\itemsep{5pt}
+\begin{itemize}\small\setlength\itemsep{2pt}
 \item \textbf{Not new}: sequence-form LP (von Stengel 1996); proximal point (Rockafellar 1976);
       semismooth Newton / active-set methods (Qi--Sun 1993; Hinterm\"uller--Ito--Kunisch 2002); interior point $+$ crossover;
       quasi-definite $LDL^\top$ (Vanderbei 1995); the CFR family.
@@ -876,14 +876,15 @@ solver for the Newton systems would need.
       semismooth Newton for \emph{matrix} games via Douglas--Rachford splitting, warm-started by PRM$^+$; experiments on
       normal-form games (Kuhn as a $27\times64$ matrix).
 \item \textbf{Here}:
-  \begin{itemize}\small
+  \begin{itemize}\footnotesize
   \item a second-order finish directly on the \emph{sequence-form} complementarity system of extensive-form poker;
   \item skew-monotone VI $+$ proximal regularisation $\Rightarrow$ uniformly nonsingular Newton matrices (one-line proof)
         and quasi-definite linear algebra;
   \item CFR average $+$ best-response values as a primal--dual warm start;
   \item tested on Leduc and no-limit river subgames with card removal --- including where it fails.
   \end{itemize}
-\item To our knowledge no poker solver uses a second-order finish.
+\item Early work solved small abstracted games exactly as LPs (Rhode Island hold'em; Gilpin \& Sandholm 2005);
+      to our knowledge no CFR-based solver hands over to a second-order method for the last digits.
 \end{itemize}
 \note{
 Be precise about novelty. The general idea ``first-order warm start, then semismooth Newton'' for zero-sum games was proposed
@@ -927,6 +928,7 @@ shifted skew systems whose off-diagonal blocks are semiseparable-plus-sparse.
 \item T.~De Luca, F.~Facchinei, C.~Kanzow. A semismooth equation approach to the solution of nonlinear complementarity problems. \emph{Math.\ Program.} 75 (1996).
 \item F.~Facchinei, J.-S.~Pang. \emph{Finite-Dimensional Variational Inequalities and Complementarity Problems}. Springer, 2003.
 \item G.~Farina, C.~Kroer, T.~Sandholm. Faster game solving via predictive Blackwell approachability: connecting regret matching and mirror descent. \emph{AAAI} 2021.
+\item A.~Gilpin, T.~Sandholm. Optimal Rhode Island hold'em poker. \emph{AAAI} 2005 (demo); Lossless abstraction of imperfect information games. \emph{J.\ ACM} 54 (2007).
 \item A.~Fischer. A special Newton-type optimization method. \emph{Optimization} 24 (1992).
 \item S.~Hart, A.~Mas-Colell. A simple adaptive procedure leading to correlated equilibrium. \emph{Econometrica} 68 (2000).
 \item M.~Johanson. Measuring the size of large no-limit poker games. arXiv:1302.7008 (2013).

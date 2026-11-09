@@ -79,6 +79,7 @@ solver/
   lp.py           exact sequence-form LP via HiGHS (reference)
   aa.py, maps.py  Anderson acceleration of the CFR+ map (negative result)
   extrap.py       reduced-rank extrapolation of CFR averages (negative result)
+  demo.py         two-second live demo (small river spot)
   bench_*.py      benchmarks -> results/*.json
   fig_*.py        figures    -> figs/*.pdf
   gen_numbers.py  results -> tex/numbers.tex (every computed number quoted on the slides)
@@ -106,6 +107,9 @@ python3 gen_numbers.py
 cd ../tex && pdflatex talk.tex && pdflatex talk.tex
 pdflatex -jobname=talk-notes "\def\notesmode{1}\input{talk.tex}"
 ```
+
+Live demo for the talk (about 2 seconds): `python3 solver/demo.py` solves the small river spot with DCFR and the
+finish, printing exploitability after every step and the big blind's strategy for a few hands.
 
 A minimal use of the solver:
 
