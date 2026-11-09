@@ -886,7 +886,7 @@ class ProxAAPDAS(ProxIPMPDAS):
     evaluation; an interior-point solve is used only for the first evaluation or as a fallback."""
     mem = 10
     reg = 1e-12
-    restart_ratio = 4.0
+    restart_ratio = 1.0
 
     def solve(self, sigma, rho=1e-3, outer=100, tol=1e-13, z0=None, track=True, inner_iters=50, verbose=False):
         import time as _time
@@ -913,9 +913,10 @@ class ProxAAPDAS(ProxIPMPDAS):
             solves += ni
             g_prev = gz
             f = gz - c
-            # restart the Anderson history if the residual blew up
+            # safeguard: if the extrapolated centre made the fixed-point residual grow, drop the history
             if Gs and np.linalg.norm(f) > self.restart_ratio * np.linalg.norm(Gs[-1] - C[-1]):
                 C, Gs = [], []
+                self.restarts = getattr(self, 'restarts', 0) + 1
             C.append(c.copy()); Gs.append(gz.copy())
             C, Gs = C[-(self.mem + 1):], Gs[-(self.mem + 1):]
             if len(C) > 1:
@@ -933,7 +934,7 @@ class ProxAAPDAS(ProxIPMPDAS):
             self.log.append((k, used, ni, res, rho))
             hist.append((k, solves, r, self.sf.T.exploitability(self.to_sigma(gz, sigma)) if track else None))
             if verbose:
-                print(hist[-1], used, ni, f'{self.clock[-1]:.1f}s', flush=True)
+                print(hist[-1], used, ni, f'|G(c)-c|={np.linalg.norm(f):.2e}', f'restarts={getattr(self, "restarts", 0)}', f'{self.clock[-1]:.1f}s', flush=True)
             if r < tol:
                 break
         self.z_final = gz

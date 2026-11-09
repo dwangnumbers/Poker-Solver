@@ -61,5 +61,5 @@ if __name__ == '__main__':
     hybrid('leduc', long, 'newton_leduc.json', out='hybrid_leduc.pdf', lp_time=0.04, base_algos=('cfr+', 'dcfr'))
     hybrid('small', 'baselines_river_small.json', 'newton_small.json', unit_scale=1.0,
            ylabel='exploitability (chips, pot = 100)', out='hybrid_small.pdf', lp_time=1.6)
-    hybrid('medium', 'baselines_river_medium_long.json', 'newton_medium.json', unit_scale=1.0,
+    hybrid('medium', 'baselines_river_medium_combined.json', 'newton_medium.json', unit_scale=1.0,
            ylabel='exploitability (chips, pot = 100)', out='hybrid_medium.pdf', base_algos=('cfr+', 'dcfr'))

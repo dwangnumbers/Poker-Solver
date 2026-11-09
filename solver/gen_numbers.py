@@ -30,7 +30,10 @@ if os.path.exists(R + 'newton_medium.json'):
     out['MedHybTime'] = f"{NM['outer'][-1][4]:.0f}"; out['MedHybExpl'] = e(NM['outer'][-1][3])
     out['MedHybOuter'] = str(NM['outer'][-1][0])
 ML = json.load(open(R + 'baselines_river_medium_long.json'))
+ML2 = json.load(open(R + 'baselines_river_medium_long2.json'))
 out['MedDCFRLongExpl'] = e(ML['dcfr'][-1][2]); out['MedDCFRLongTime'] = f"{ML['dcfr'][-1][1]:.0f}"
+out['MedDCFRLongTwoExpl'] = e(ML2['dcfr'][-1][2]); out['MedDCFRLongTwoTime'] = f"{ML2['dcfr'][-1][1]:.0f}"
+out['MedDCFRLongTwoIters'] = f"{ML2['dcfr'][-1][0]:,}".replace(',', '{,}')
 out['MedCFRpLongExpl'] = e(ML['cfr+'][-1][2])
 for nm, f in (('Leduc', 'newton_leduc.json'), ('Small', 'newton_small.json')):
     for r in json.load(open(R + f)):

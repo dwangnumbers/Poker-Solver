@@ -913,12 +913,13 @@ Exploitability in chips with pot 100: $10^{-6}$ chips is $10^{-8}$ of the pot.
 \includegraphics[width=\linewidth]{hybrid_medium.pdf}\\
 {\scriptsize 473 vs 328 combos, 3 bet sizes; 17{,}626 unknowns.}
 \column{0.48\textwidth}
-\begin{itemize}\small\setlength\itemsep{3pt}
-\item DCFR: $\MedDCFRLongExpl$ after 100{,}000 iterations (\MedDCFRLongTime\,s).
-\item Hybrid: $\MedHybExpl$ after \MedHybOuter\ prox steps (\MedHybTime\,s). \alert{CFR wins.}
+\begin{itemize}\footnotesize\setlength\itemsep{2pt}
+\item DCFR: $\MedDCFRLongExpl$ after 100{,}000 iterations (\MedDCFRLongTime\,s), $\MedDCFRLongTwoExpl$ after \MedDCFRLongTwoIters\ (\MedDCFRLongTwoTime\,s).
+\item Hybrid ($\rho=10^{-5}$): $\MedHybExpl$ after \MedHybOuter\ prox steps (\MedHybTime\,s). \alert{CFR wins.}
 \item Why: equilibria are far from unique (many hands never matter) $\Rightarrow$ flat directions, $\|(M+\rho I)^{-1}\|\approx 1/\rho$.
       An interior point with subproblem residual $4\times10^{-6}$ still predicts a wrong active set: the crossover step jumps to residual $0.1$.
-\item Larger $\rho = 10^{-3}$: crossover works (3--5 solves per step) but each prox step gains only $\sim$5\%.
+\item Larger $\rho = 3\times10^{-4}$: active-set steps work (2--5 solves per prox step) but each step gains only a few \%.
+      Anderson acceleration of the \emph{proximal} map helps ($8\times10^{-7}$ at 480\,s), then stalls.
 \end{itemize}
 \end{columns}
 \note{
@@ -927,6 +928,10 @@ $LDL^\top$; 25\,s with plain sparse LU), i.e.\ thousands of DCFR iterations, and
 crossover from the interior point lands on a wrong active set (the error is amplified by $\|(M+\rho I)^{-1}\|\approx 1/\rho$), so
 every proximal step falls back to a full interior-point solve. We also tried decreasing $\rho$ gradually from $10^{-3}$: the
 active-set steps track the solution down to $\rho\approx10^{-4}$ and then lose it.\\[3pt]
+A twist worth telling: Anderson acceleration, which did nothing for CFR's nonsmooth map, \emph{does} accelerate the proximal
+map, which is piecewise affine with a slowly changing active set (Leduc at $\rho=10^{-3}$: 20 prox steps become 9; medium at
+$\rho=3\times10^{-4}$: residual $2\times10^{-7}$ after 150 steps instead of $8\times10^{-6}$ after 60). On the medium spot it then stalls,
+and DCFR, given the same 8 minutes, gets to $3.6\times10^{-7}$.\\[3pt]
 So: at realistic sizes CFR remains the right tool for the practical accuracy range, and the second-order finish is a
 small-to-medium-size, high-precision tool --- for now.
 }

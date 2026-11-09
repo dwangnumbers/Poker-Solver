@@ -47,7 +47,7 @@ CFR does the cheap global phase. The finish does the local phase, where CFR's av
 |---|---|---|---|
 | Leduc hold'em (964 unknowns) | CFR⁺: 9.2e-7 after 50 000 iterations (130 s) | **5.5e-14 in 0.33 s** (100 DCFR its + 19 linear solves) | 0.04 s |
 | NLHE river, 147 vs 139 combos (2 864 unknowns) | DCFR: 5.4e-6 after 30 000 iterations (9 s) | **3.9e-14 in 1.9 s** (1000 DCFR its + 17 linear solves) | 1.6 s |
-| NLHE river, 473 vs 328 combos (17 626 unknowns) | DCFR: **1.8e-6 after 100 000 iterations (282 s)** | 3.2e-5 after 3 proximal steps (528 s) | not finished after 25 min |
+| NLHE river, 473 vs 328 combos (17 626 unknowns) | DCFR: **1.8e-6 after 100 000 iterations (282 s); 3.6e-7 after 190 000 (520 s)** | 3.2e-5 after 3 proximal steps (528 s); with ρ = 3e-4 and Anderson acceleration of the proximal map, 8.0e-7 at 480 s, then stalls | not finished after 25 min |
 
 **Where it wins.** On small and mid-sized subgames the hybrid reaches machine-precision equilibria where CFR-type
 methods would need millions of iterations. It also identifies the exact support of the equilibrium.
@@ -73,6 +73,7 @@ solver/
                     ProxIPMPDAS           <- the method of the talk (prox point; IPM + crossover; active-set Newton)
                     ProxNewtonQD          prox point + Fischer-Burmeister semismooth Newton, quasi-definite LDLᵀ
                     ProxNewtonFB(Reduced) same iterates as ProxNewtonQD, unsymmetric sparse LU
+                    ProxAAPDAS            Anderson-accelerated proximal map (helps the outer loop; stalls on the medium spot)
                     purify, fb_scaling, ProxSmoothNewtonQD, ProxIPMNewton   experiments
                     ProxNewton            min-function (primal-dual active set) variant
                     NewtonFinish, SmoothingNewton, crossover   earlier attempts (do not work on Leduc)
