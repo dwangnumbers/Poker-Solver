@@ -81,7 +81,7 @@
 \begin{frame}
   \titlepage
 \note{
-\textbf{Timing plan (60 min, 40 slides).} Hook \& rules 6 $\cdot$ Games, equilibria, sequence form 11 $\cdot$
+\textbf{Timing plan (60 min, 37 main slides + backups).} Hook \& rules 6 $\cdot$ Games, equilibria, sequence form 11 $\cdot$
 Regret minimisation and CFR 13 $\cdot$ What solutions look like 6 $\cdot$ The new method 13 $\cdot$ Demo, results, limits, wrap-up 11.\\
 If running late, skip: ``Kuhn poker'', ``Modern CFR = numerical tricks'' (one sentence), ``Attempt 1: Anderson'' (one sentence),
 ``The linear algebra'' (one sentence: quasi-definite, so any ordering works), backup slides.\\[4pt]
@@ -1063,6 +1063,21 @@ shifted skew systems whose off-diagonal blocks are semiseparable-plus-sparse.
 \item Dual warm start: $p_I = r_1(h)\,\mathrm{BR}_1(I,h)/Z$, $q_J = -r_2(h)\,\mathrm{BR}_2(J,h)/Z$.
 \end{itemize}
 \note{Backup only.}
+\end{frame}
+
+\begin{frame}{Backup: the proximal-point rate, and why flat equilibria hurt}
+\begin{itemize}\setlength\itemsep{6pt}
+\item $T(z) = Mz + b + N_{\mathcal K}(z)$ is maximal monotone; the step $z^{k+1} = (I + \rho^{-1}T)^{-1}z^k$ is a resolvent: firmly
+      nonexpansive, Fej\'er monotone towards the solution set $Z$.
+\item If $T^{-1}$ is (upper) Lipschitz at $0$ with modulus $a$ --- true for polyhedral $T$ (Robinson 1981) --- then
+      (Rockafellar 1976; Luque 1984)
+      \[ \operatorname{dist}(z^{k+1}, Z) \ \le\ \frac{a\rho}{\sqrt{1 + a^2\rho^2}}\ \operatorname{dist}(z^k, Z). \]
+\item $a$ measures how far a small residual can be from $Z$: it is large when the equilibrium set is ``flat'' (many
+      hands whose actions barely matter).
+\item Fast outer loop needs $\rho \ll 1/a$; but $\|(M+\rho I)^{-1}\|\approx 1/\rho$ then makes each subproblem's
+      active set fragile. Leduc and the small spot: observed factor $\approx10^{-3}$ per step at $\rho=10^{-5}$ (so $a\rho\approx10^{-3}$); on the medium spot no $\rho$ we tried gave both.
+\end{itemize}
+\note{Backup for questions about the outer loop. The last bullet is the one-sentence diagnosis of the medium spot.}
 \end{frame}
 
 \begin{frame}{Backup: effect of the proximal parameter}
