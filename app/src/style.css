@@ -147,7 +147,7 @@ button.pcard:hover { transform: translateY(-2px); }
 .detail td, .detail th { padding: 2px 3px; text-align: right; border-bottom: 1px solid var(--line); font-weight: 400; white-space: nowrap; }
 .detail th { color: var(--ink2); font-size: 11px; }
 .detail td:first-child, .detail th:first-child { text-align: left; }
-.detail tr.pick { cursor: pointer; } .detail tr.pick:hover td { background: var(--soft); }
+.detail tr.hrow { cursor: pointer; } .detail tr.hrow:hover td { background: var(--soft); }
 .detail .mini { display: inline-flex; width: 46px; height: 9px; border-radius: 2px; overflow: hidden; vertical-align: middle; background: var(--empty); }
 .detail .mini i { display: block; height: 100%; }
 .editbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }

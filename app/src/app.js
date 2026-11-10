@@ -137,6 +137,7 @@
     for (let h = 0; h < S.g.N; h++) { a += r[h] * ev[h]; b += r[h] * m[h]; }
     return b > 1e-12 ? (a / b / n.amount + 1) / 2 : NaN;
   }
+  const ART = { 'high card': 'a ', pair: 'a ', straight: 'a ', flush: 'a ', 'full house': 'a ', 'straight flush': 'a ' };
   function resultText(n, short) {
     const g = S.g, total = potNow(n);
     if (n.type === 'fold') { const w = 1 - n.folder; return `${nm(n.folder)} folds and ${nm(w)} wins the pot of ${fmt(total)}`; }
@@ -144,7 +145,7 @@
     if (a >= 0 && b >= 0) {
       if (g.key[a] === g.key[b]) return `Showdown: the pot of ${fmt(total)} is split`;
       const w = g.key[a] > g.key[b] ? 0 : 1;
-      return `Showdown: ${nm(w)} wins ${fmt(total)} with ${P.categoryOf(g.key[w ? b : a])}`;
+      return `Showdown: ${nm(w)} wins ${fmt(total)} with ${ART[P.categoryOf(g.key[w ? b : a])] || ''}${P.categoryOf(g.key[w ? b : a])}`;
     }
     const eq = showdownEquity(n);
     return short ? `Showdown for a pot of ${fmt(total)}` : `Showdown for a pot of ${fmt(total)}. With the ranges that reach this point, ${nm(0)} wins ${pct(eq, 0)} of the time and ${nm(1)} wins ${pct(1 - eq, 0)}.`;
@@ -247,7 +248,7 @@
     for (const h of hs) {
       let mini = '';
       if (acting) { const sig = S.strat[n.di]; mini = '<td><span class="mini">' + n.actions.map((a, i) => `<i style="width:${100 * sig[h * na + i]}%;background:${cols[i]}"></i>`).join('') + '</span></td>'; }
-      html += `<tr class="pick" data-h="${h}" title="Put this hand on the table"><td>${handText(h)}</td><td>${pct(r[h], 0)}</td>${mini}<td>${r[h] > 1e-9 ? fmt1(handEV(n, p, h, S.mass[p])) : ''}</td></tr>`;
+      html += `<tr class="hrow" data-h="${h}" title="Put this hand on the table"><td>${handText(h)}</td><td>${pct(r[h], 0)}</td>${mini}<td>${r[h] > 1e-9 ? fmt1(handEV(n, p, h, S.mass[p])) : ''}</td></tr>`;
     }
     html += '</table>';
     if (acting) {

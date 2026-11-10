@@ -143,7 +143,8 @@ branches that were not taken.
 **Do.** Guide step 6. The page selects ace-nine offsuit, a hand that mixes between folding and calling.
 
 **Say.** "Ace-nine folds 63% of the time and calls 37%. Look at the values in the small table on the right.
-Folding is worth 0.0 chips and calling is worth 0.0 chips. Raising would lose 2 chips, so it is never used. This
+Folding is worth 0.0 chips and calling is worth 0.0 chips, or 0.1 after only 1 000 iterations, which is the accuracy
+of the solve. Raising would lose 2 chips, so it is never used. This
 is the equilibrium condition from the linear programming slide, seen on one hand. An action can only be used
 with positive probability if its value equals the best value. Every mixed square on this grid is an equation of
 that kind, and the solver has found the frequencies that make all of them hold at once."
