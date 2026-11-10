@@ -1,0 +1,104 @@
+<div class="top"><div class="top-in">
+  <h1>River Solver Table</h1>
+  <div class="spot" id="spotline"></div>
+  <button class="btn" id="btnGuide" type="button">Demo guide</button>
+</div></div>
+
+<div class="wrap">
+  <details class="panel setup" id="setup">
+    <summary>Set up the spot</summary>
+    <div class="setup-grid">
+      <label class="f">Name of the first player to act<input id="name0" autocomplete="off"></label>
+      <label class="f">Name of the player in position<input id="name1" autocomplete="off"></label>
+      <label class="f">Pot at the start of the river<input id="pot" type="number" min="1" step="1"></label>
+      <label class="f">Stack behind for each player<input id="stack" type="number" min="1" step="1"></label>
+      <label class="f">First player's bet sizes, percent of pot<input id="bets0" autocomplete="off"></label>
+      <label class="f">In-position bet sizes, percent of pot<input id="bets1" autocomplete="off"></label>
+      <label class="f">Raise sizes, percent of pot<input id="raises" autocomplete="off"></label>
+      <label class="f">Most bets and raises in a line<select id="maxRaises"><option>1</option><option>2</option><option>3</option></select></label>
+    </div>
+    <div class="setup-row">
+      <button class="btn" id="btnTalk" type="button">Load the talk example</button>
+      <button class="btn" id="btnRandomBoard" type="button">Random board</button>
+      <button class="btn" id="btnSwap" type="button">Swap the two seats</button>
+      <span class="muted">An all-in is always allowed. Click a board card on the table to change it.</span>
+    </div>
+  </details>
+
+  <div class="cols">
+    <div class="col">
+      <section class="panel">
+        <h2>The table <span class="h2r"><button class="btn small" id="btnDeal" type="button">Deal hands from the ranges</button><button class="btn small" id="btnHide" type="button">Hide hands</button></span></h2>
+        <div class="table-wrap"><div class="rail"><div class="felt">
+          <div class="result" id="result" hidden></div>
+          <div class="board" id="board"></div>
+          <div class="potline" id="potline"></div>
+          <div class="wager wager0" id="wager0"></div>
+          <div class="wager wager1" id="wager1"></div>
+          <div class="seat seat0" id="seat0"></div>
+          <div class="seat seat1" id="seat1"></div>
+        </div></div></div>
+        <div class="crumbs" id="crumbs"></div>
+        <div class="actions" id="actions"></div>
+        <p class="undernote" id="undernote"></p>
+        <div class="rowbtns">
+          <button class="btn" id="btnBack" type="button">Back one action</button>
+          <button class="btn" id="btnRestart" type="button">Back to the start</button>
+          <button class="btn" id="btnSample" type="button">Let the solver act</button>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Game tree <span class="h2r"><button class="btn small" id="btnTreeAll" type="button" aria-pressed="true">Whole tree</button><button class="btn small" id="btnTreeLine" type="button" aria-pressed="false">Current line</button></span></h2>
+        <div class="treebox" id="treebox"></div>
+        <p class="hint" id="treehint"></p>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel">
+        <h2>Ranges and strategy <span class="h2r"><button class="btn small" id="btnEdit" type="button" aria-pressed="false">Edit this range</button></span></h2>
+        <div class="tabs" role="tablist" id="tabs"></div>
+        <div class="editbar" id="editbar" hidden>
+          <span class="muted">Paint with weight</span>
+          <span id="brushes"></span>
+          <select class="inp" id="preset" aria-label="Range preset"></select>
+          <button class="btn small" id="btnClear" type="button">Clear</button>
+          <textarea id="rangeText" spellcheck="false" aria-label="Range in standard notation"></textarea>
+          <button class="btn small" id="btnApplyText" type="button">Apply the text</button>
+          <span class="muted" id="rangeCount"></span>
+        </div>
+        <div class="gridbox">
+          <div>
+            <div class="grid" id="grid"></div>
+            <div class="rangebar" id="rangebar"></div>
+            <div class="legend" id="legend"></div>
+          </div>
+          <div class="detail" id="detail"></div>
+        </div>
+        <p class="hint" id="gridhint"></p>
+      </section>
+      <section class="panel">
+        <h2>Solver and algorithm comparison</h2>
+        <div class="solvebar">
+          <label class="f">Algorithm shown on the table<select id="algo"></select></label>
+          <label class="f">Iterations<input id="target" type="number" min="10" step="10" style="width:110px"></label>
+          <button class="btn primary" id="btnSolve" type="button">Solve</button>
+          <button class="btn" id="btnRace" type="button">Race all four</button>
+          <button class="btn" id="btnStop" type="button">Stop</button>
+          <button class="btn" id="btnReset" type="button">Start over</button>
+        </div>
+        <p class="status" id="status"></p>
+        <div class="chartbox" id="chartbox"></div>
+        <table class="racetab" id="racetab"></table>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div class="pop" id="pop" hidden><div class="box"><h3 id="popTitle"></h3><div class="pick" id="pick"></div>
+  <div class="setup-row"><button class="btn" id="popRandom" type="button" hidden>Random hand from the range</button><button class="btn" id="popCancel" type="button">Cancel</button></div></div></div>
+
+<aside class="guide" id="guide" hidden>
+  <header><h2>Demo guide</h2><button class="btn small" id="btnGuideClose" type="button">Close</button></header>
+  <ol id="guideList"></ol>
+</aside>
