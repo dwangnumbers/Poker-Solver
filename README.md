@@ -15,7 +15,30 @@ The solver has two parts:
    - Verify the result in the full game with exact best responses. Add back any profitable pruned action, and
      repeat.
 
-The talk is in `tex/`: `talk.pdf` has the slides and `talk-notes.pdf` the speaker notes.
+The talk is in `tex/`: `talk.pdf` has the slides and `talk-notes.pdf` the speaker notes. A longer version of the
+deck, with every citation and the extra technical slides, is `talk-detailed.pdf`.
+
+## Interactive demonstration
+
+`app/poker-solver.html` is a single self-contained page. Open it in any browser; it needs no server and no network.
+It shows a river hand on a poker table and solves it live:
+
+- **The table.** Click a board card to change it, click a player's cards to choose a hand, and click the action
+  buttons to play the hand. The pot, the stacks and the bets follow along.
+- **Range grids.** One tab for each player. For the player to act, every hand is coloured by action, with a
+  separate colour for each bet size. For the other player, the grid shows how much of each hand is still in the
+  range. Click a square to see the strategy and the value of each individual hand. Ranges can be painted or typed.
+- **Game tree.** The public betting tree with the solved frequency on every branch. It follows the hand as it is
+  played, and any point can be clicked.
+- **Algorithm comparison.** CFR, CFR⁺, DCFR and PCFR⁺ race on the spot you set up, and their exploitability is
+  plotted against iterations.
+
+The solver core is `app/src/solver.js`, a JavaScript port of `solver/cfr.py` with an O(n) evaluation of each leaf
+(sorted running sums with a card-removal correction). On the talk example it agrees with the Python solver: after
+5 000 DCFR iterations both report an exploitability of 1.34e-4 chips. One iteration takes about a millisecond.
+
+`app/DEMO_NOTES.md` (also as a PDF) has the speaking notes for a twelve minute demonstration, and the same steps are
+built into the page under **Demo guide**. To rebuild the page after editing `app/src/`, run `python3 app/build.py`.
 
 ## The idea
 
@@ -101,7 +124,10 @@ solver/
   gen_numbers.py  results -> tex/numbers.tex (every computed number quoted on the slides)
 results/          benchmark outputs
 figs/             figures used in the talk
-tex/              talk.tex, talk.pdf, talk-notes.pdf
+tex/              talk.tex, talk.pdf, talk-notes.pdf (the deck used with the live demonstration)
+                  talk-detailed.tex and its PDFs (longer version with all citations)
+app/              poker-solver.html (the interactive page), DEMO_NOTES.md, build.py
+  src/            solver.js (CFR core), app.js (interface), style.css, body.html
 ```
 
 ## Reproduce
