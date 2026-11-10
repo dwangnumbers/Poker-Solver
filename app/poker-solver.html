@@ -1111,6 +1111,8 @@ button.pcard:hover { transform: translateY(-2px); }
       () => { S.tab = 0; S.sel = -1; goLine(['check', 'bet 75']); }],
     ['A hand that is indifferent', 'Select a hand that mixes between calling and folding. Its value is the same for both actions, which is exactly the equilibrium condition.',
       () => { S.tab = 0; goLine(['check', 'bet 75']); S.sel = mixedClass(); renderAll(); }],
+    ['The pot odds check', 'The big blind bets a third of the pot. The simple formula from the slides says the button should fold about a quarter of the time, and the solved strategy agrees.',
+      () => { S.sel = -1; S.hole = [-1, -1]; goLine(['bet 33']); S.tab = 1; renderAll(); }],
     ['The button’s side', 'Switch to the button’s tab after the check to see which hands bet for value, which bluff, and which give up.',
       () => { S.sel = -1; goLine(['check']); S.tab = 1; renderAll(); }],
     ['Change the river card', 'Replace the last board card with the nine of hearts and solve again. Straights are now possible, and both strategies change.',
