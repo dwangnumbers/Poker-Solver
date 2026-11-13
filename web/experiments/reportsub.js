@@ -15,9 +15,9 @@ function solveFlop(f) {
 }
 const sizes = (process.argv[2] || '25,49,95,184').split(',').map(Number), res = { rows: [] };
 for (const n of sizes) {
-  const sub = subset(FL, n); let W = 0, v = 0, b = 0; const t0 = Date.now();
-  for (const f of sub) { const r = solveFlop(f); W += f.w; v += f.w * r.val0; b += f.w * r.oopBet; }
-  res.rows.push({ n: sub.length, oopValue: v / W, oopBetFreq: b / W, seconds: (Date.now() - t0) / 1000 });
+  const sub = subset(FL, n); let W = 0, v = 0, b = 0; const t0 = Date.now(), flops = [];
+  for (const f of sub) { const r = solveFlop(f); W += f.w; v += f.w * r.val0; b += f.w * r.oopBet; flops.push({ label: f.label, w: f.w, group: require('../js/flops.js').group(f), val0: r.val0, oopBet: r.oopBet, expl: r.expl }); }
+  res.rows.push({ n: sub.length, oopValue: v / W, oopBetFreq: b / W, seconds: (Date.now() - t0) / 1000, flops });
   console.log(JSON.stringify(res.rows[res.rows.length - 1]));
   fs.writeFileSync(__dirname + '/out/reportsub.json', JSON.stringify(res));
 }

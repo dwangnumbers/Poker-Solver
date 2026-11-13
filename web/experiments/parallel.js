@@ -5,11 +5,11 @@ const { E, SPOTS } = require('./spots.js'), { Pool } = require('../js/pool.js'),
   const res = { cores: os.cpus().length, rows: [] };
   for (const key of ['turn', 'flop']) {
     const cfg = SPOTS[key].cfg;
-    const seq = new E.Solver(E.buildGame(cfg)); seq.iterate(1); let t0 = Date.now(); seq.iterate(3); const tSeq = (Date.now() - t0) / 3;
+    const seq = new E.Solver(E.buildGame(cfg)); seq.iterate(2); let t0 = Date.now(); seq.iterate(4); const tSeq = (Date.now() - t0) / 4;
     const ev = seq.evaluate();
     for (const K of [1, 2]) {
-      const P = await Pool.create(cfg, { workers: K }); await P.iterate(1);
-      t0 = Date.now(); await P.iterate(3); const tPool = (Date.now() - t0) / 3;
+      const P = await Pool.create(cfg, { workers: K }); await P.iterate(2);
+      t0 = Date.now(); await P.iterate(4); const tPool = (Date.now() - t0) / 4;
       // the same iterates: compare with the sequential run of 4 iterations
       const r = await P.evaluate();
       // coordinator time per pass (value mode, no updates) and data moved per pass (reach vectors out, sums back)

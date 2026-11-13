@@ -27,16 +27,16 @@ function sampleEq(cls, S, rand) {
   return ok ? Array.from(acc, x => x / ok) : null;
 }
 if (isMainThread) {
-  const S2 = +process.argv[2] || 50000, S3 = +process.argv[3] || 1000, W = require('os').cpus().length;
+  const S2 = +process.argv[2] || 50000, S3 = process.argv[3] === undefined ? 1000 : +process.argv[3], SEED = +process.argv[4] || 12345, SUFFIX = process.argv[5] || '', W = require('os').cpus().length;
   const out = path.join(__dirname, '..', 'data'); fs.mkdirSync(out, { recursive: true });
   // exact compatible pair counts
   const c2 = new Uint16Array(169 * 169);
   for (let a = 0; a < 1326; a++) for (let b = 0; b < 1326; b++) { const x = [E.COMBO_A[a], E.COMBO_B[a]], y = [E.COMBO_A[b], E.COMBO_B[b]]; if (x[0] !== y[0] && x[0] !== y[1] && x[1] !== y[0] && x[1] !== y[1]) c2[E.COMBO_CLASS[a] * 169 + E.COMBO_CLASS[b]]++; }
-  fs.writeFileSync(path.join(out, 'c2.u16'), Buffer.from(c2.buffer));
+  if (!SUFFIX) fs.writeFileSync(path.join(out, 'c2.u16'), Buffer.from(c2.buffer));
   const t0 = Date.now(); let done = 0;
   const eq2 = new Float32Array(169 * 169), eq3 = new Uint16Array(818805 * 3);
   const jobs = Array.from({ length: W }, (_, w) => new Promise(res => {
-    const wk = new Worker(__filename, { workerData: { w, W, S2, S3 } });
+    const wk = new Worker(__filename, { workerData: { w, W, S2, S3, SEED } });
     wk.on('message', m => {
       if (m.kind === 'eq2') for (const [i, j, e] of m.rows) { eq2[i * 169 + j] = e; eq2[j * 169 + i] = 1 - e; }
       else if (m.kind === 'eq3') for (const [t, a, b, c] of m.rows) { eq3[3 * t] = a; eq3[3 * t + 1] = b; eq3[3 * t + 2] = c; }
@@ -45,12 +45,12 @@ if (isMainThread) {
     wk.on('exit', res);
   }));
   Promise.all(jobs).then(() => {
-    fs.writeFileSync(path.join(out, 'eq2.f32'), Buffer.from(eq2.buffer));
-    fs.writeFileSync(path.join(out, 'eq3.u16'), Buffer.from(eq3.buffer));
+    fs.writeFileSync(path.join(out, 'eq2' + SUFFIX + '.f32'), Buffer.from(eq2.buffer));
+    if (S3 > 0) fs.writeFileSync(path.join(out, 'eq3' + SUFFIX + '.u16'), Buffer.from(eq3.buffer));
     console.log('done in', ((Date.now() - t0) / 1000).toFixed(0), 's');
   });
 } else {
-  const { w, W, S2, S3 } = workerData, rand = rng(12345 + w * 7919);
+  const { w, W, S2, S3, SEED } = workerData, rand = rng(SEED + w * 7919);
   // pairs: rows i assigned round-robin
   for (let i = w; i < 169; i += W) {
     const rows = [];
@@ -59,6 +59,7 @@ if (isMainThread) {
   }
   // triples a <= b <= c in lexicographic order; t indexes them
   let t = 0;
+  if (S3 === 0) return;
   for (let a = 0; a < 169; a++) {
     const rows = [];
     for (let b = a; b < 169; b++) for (let c = b; c < 169; c++, t++) {

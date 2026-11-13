@@ -10,6 +10,10 @@ const cfgs = [
   ['flop, checked down later', 'Ks7d2c', 5.5, 97.5, T([x([33], [50]), x([33, 75], [50])], [x(), x()], [x(), x()], 2)],
   ['flop, 1 size per street', 'Ks7d2c', 5.5, 97.5, T([x(), x([33])], [x([75]), x([75])], [x([75]), x([75])], 2)],
   ['flop, standard', 'Ks7d2c', 5.5, 97.5, T([x([], [50]), x([33])], [x([75]), x([75])], [x([75]), x([75])], 2)],
+  ['river, 3 sizes, raises', 'Ks7d2cTh4s', 20, 87, T([x(), x()], [x(), x()], [x([33, 75, 150], [50], 1), x([33, 75, 150], [50], 1)], 3)],
+  ['turn, river checked down', 'Ks7d2c5h', 12, 91, T([x(), x()], [x([50, 100], [50]), x([50, 100], [50])], [x(), x()], 2)],
+  ['turn, two sizes', 'Ks7d2c5h', 12, 91, T([x(), x()], [x([50, 100]), x([50, 100], [50])], [x([75], [], 1), x([75], [], 1)], 2)],
+  ['flop, river checked down', 'Ks7d2c', 5.5, 97.5, T([x([33]), x([33, 75])], [x([75]), x([75])], [x(), x()], 2)],
 ];
 const res = [];
 for (const [name, b, pot, stack, tree] of cfgs) {
@@ -18,9 +22,12 @@ for (const [name, b, pot, stack, tree] of cfgs) {
   let nf = 0, ns = 0, nc = 0; const seen = new Set();
   (function walk(n) { if (!n) return; if (n.t === 'f') { nf++; return; } if (n.t === 's') { ns++; return; } if (n.t === 'c') { nc++; n.cards.forEach(c => walk(n.ch[c])); return; } n.ch.forEach(walk); })(g.root);
   const work = g.decisions.reduce((a, d) => a + g.n[d.p] * d.na, 0);
+  // leaf and chance work in hand units: each traversal evaluates every leaf for the traversing player
+  const nn = (g.n[0] + g.n[1]) / 2; let wf = 0, ws = 0, wc = 0;
+  (function walk(n) { if (!n) return; if (n.t === 'f') { wf += nn; return; } if (n.t === 's') { ws += nn; return; } if (n.t === 'c') { wc += nn * n.cards.length; n.cards.forEach(c => walk(n.ch[c])); return; } n.ch.forEach(walk); })(g.root);
   s.iterate(1); const reps = work > 3e7 ? 4 : work > 3e6 ? 10 : 40;
   const t1 = Date.now(); s.iterate(reps); const per = (Date.now() - t1) / reps;
-  const r = { name, decisions: g.decisions.length, work, foldLeaves: nf, showLeaves: ns, chance: nc, n: g.n, memMB: g.memBytes / 1e6, buildMs: tb, msPerIter: per };
+  const r = { name, decisions: g.decisions.length, work, foldWork: wf, showWork: ws, chanceWork: wc, foldLeaves: nf, showLeaves: ns, chance: nc, n: g.n, memMB: g.memBytes / 1e6, buildMs: tb, msPerIter: per };
   res.push(r); console.log(JSON.stringify(r));
 }
 fs.writeFileSync(__dirname + '/out/scaling.json', JSON.stringify(res));

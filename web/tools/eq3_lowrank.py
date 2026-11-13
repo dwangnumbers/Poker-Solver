@@ -36,6 +36,7 @@ for i in range(169):
     lam_all.append(w[order])
     U_all.append(V[:, order])
 print("rank  rel. Frobenius error (max over i)  rel. contraction error (max)")
+rows = []
 for r in (1, 2, 4, 6, 8, 12, 16, 24, 32):
     ef, ec = 0.0, 0.0
     for i in range(169):
@@ -46,6 +47,10 @@ for r in (1, 2, 4, 6, 8, 12, 16, 24, 32):
         approx = np.einsum("jn,jk,kn->n", A, Fr, B)
         ec = max(ec, np.max(np.abs(exact - approx) / np.abs(exact)))
     print(f"{r:4d}  {ef:.3e}  {ec:.3e}")
+    rows.append({"rank": r, "sliceError": ef, "contractionError": ec})
+import json
+(pathlib.Path(__file__).resolve().parent.parent / "experiments" / "out" / "lowrank.json").write_text(json.dumps(
+    {"rows": rows, "test": "20 pairs of random ranges per class: entries uniform on [0,1], each kept with probability 0.4"}))
 lam = np.array([l[:R] for l in lam_all], dtype=np.float32)
 U = np.array([u[:, :R].T for u in U_all], dtype=np.float32)          # (169, R, 169)
 out = np.concatenate([[np.float32(R)], lam.ravel(), U.ravel()]).astype(np.float32)

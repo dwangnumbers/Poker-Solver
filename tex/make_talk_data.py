@@ -43,12 +43,17 @@ def table(name, header, rows, align):
     (data / f"{name}.tex").write_text(s)
 
 
-def slope(pts, lo_frac=0.5):
+def slope(pts):
+    """least-squares slope of log(expl) against log(T) over the last decade [T/10, T], with its standard error"""
     pts = [p for p in pts if p[1] > 0]
-    k0 = int(len(pts) * lo_frac)
-    x = np.log([p[0] for p in pts[k0:]])
-    y = np.log([p[1] for p in pts[k0:]])
-    return np.polyfit(x, y, 1)[0]
+    T = pts[-1][0]
+    q = [p for p in pts if p[0] >= T / 10]
+    x = np.log([p[0] for p in q]); y = np.log([p[1] for p in q])
+    A = np.vstack([x, np.ones_like(x)]).T
+    coef, res, *_ = np.linalg.lstsq(A, y, rcond=None)
+    r = y - A @ coef
+    se = math.sqrt((r @ r) / max(1, len(x) - 2) / ((x - x.mean()) @ (x - x.mean())))
+    return coef[0], se, len(x)
 
 
 # ---- convergence
@@ -67,7 +72,7 @@ for ax, (key, d) in zip(axes, conv.items()):
         ax.set_ylabel("exploitability, % of pot")
         ax.legend(fontsize=8)
     for name, pts in d["series"].items():
-        slopes.append((key, name, slope(pts)))
+        slopes.append((key, name) + slope(pts))
         last = pts[-1]
         macros[f"Conv{key.capitalize()}{name.replace('+', 'p')}"] = "$" + sci(last[1], 1) + "$"
     dc = d["series"].get("DCFR")
@@ -78,8 +83,8 @@ fig.tight_layout()
 fig.savefig(figs / "conv_streets.pdf")
 plt.close(fig)
 by = {}
-for key, name, s in slopes:
-    by.setdefault(name, []).append(f"{s:.2f}")
+for key, name, sl, se, npts in slopes:
+    by.setdefault(name, []).append(f"{sl:.2f}\\pm{se:.2f}")
 macros["ConvSlopes"] = "; ".join(f"{n.replace('+', '$^+$')} ${', '.join(v)}$" for n, v in by.items()) + " for river, turn and flop"
 
 # ---- leaf cost
@@ -147,7 +152,7 @@ if pa:
 
 # ---- lock
 lk = load("lock")
-if lk:
+if lk and "pts" in lk:
     b, a = lk["before"], lk["after"]
     bi = next(i for i, x in enumerate(b["acts"]) if x.startswith("bet"))
     fi = next(i for i, x in enumerate(b["oopActs"]) if x.startswith("fold"))
@@ -193,8 +198,183 @@ cnt = np.array([6 if i // 13 == i % 13 else 4 if i // 13 < i % 13 else 12 for i 
 M = c2 / np.outer(cnt, cnt)
 macros["DDensity"] = f"{100 * np.mean(M < 1 - 1e-12):.0f}\\%"
 
-# ---- fixed numbers
-macros["TurnLP"] = "24.92419856"
-macros["TurnJS"] = "24.92419863"
+
+
+# =====================================================================================  second round of results
+def mac(k, v):
+    macros[k] = v
+
+
+def pm(v, e, d=3):
+    return f"{v:.{d}f} $\\pm$ {e:.{d}f}"
+
+
+# sizes of the convergence spots
+cs = {st: load(f"convspots_{st}") for st in ("river", "turn", "flop")}
+rows = []
+for st in ("river", "turn", "flop"):
+    if cs[st]:
+        r = cs[st][0]
+        rows.append([st, f"{r['decisions']:,}", f"{r['n'][0]} / {r['n'][1]}"])
+if rows:
+    table("size_table", ["street", "decision nodes", "hands"], rows, "lrr")
+# iterations to tolerance
+rows = []
+for st in ("river", "turn", "flop"):
+    if not cs[st]:
+        continue
+    cells = [st, str(len(cs[st]))]
+    for t in ("1", "0.3", "0.1"):
+        its = [r["hit"].get(t) for r in cs[st]]
+        ok = [i for i in its if i is not None]
+        if len(ok) < len(its):
+            cells.append(f"{int(np.median(ok)) if ok else '--'} ({len(its) - len(ok)} not reached)" if ok else "not reached")
+        else:
+            cells.append(f"{int(np.median(ok))} ({min(ok)}--{max(ok)})")
+    rows.append(cells)
+if rows:
+    table("tol_table", ["street", "spots", "1\\%", "0.3\\%", "0.1\\%"], rows, "lrrrr")
+if cs["flop"]:
+    d = cs["flop"][0]
+    mac("FlopInfosets", "$" + sci(d["decisions"] * (d["n"][0] + d["n"][1]) / 2, 1) + "$")
+
+# cost model
+sc = load("scaling")
+if sc and "foldWork" in sc[0]:
+    from scipy.optimize import nnls
+    X = np.array([[r["work"], r["showWork"], r["foldWork"], r["chanceWork"]] for r in sc], float)
+    y = np.array([r["msPerIter"] for r in sc], float)
+    w = 1 / y                                      # relative residuals
+    coef, _ = nnls(X * w[:, None], y * w)
+    pred = X @ coef
+    rel = np.abs(pred - y) / y
+    for k, c in zip("ABCD", coef):
+        mac("Cost" + k, f"{1e6 * c:.0f}" if 1e6 * c >= 10 else f"{1e6 * c:.1f}")
+    mac("CostTrees", str(len(sc)))
+    mac("CostResid", f"{100 * rel.max():.0f}\\%")
+    rows = [[r["name"], f"{r['decisions']:,}", f"{r['msPerIter']:.1f}" if r["msPerIter"] < 10 else f"{r['msPerIter']:.0f}",
+             f"{pr:.1f}" if pr < 10 else f"{pr:.0f}"] for r, pr in zip(sc, pred)]
+    table("cost_table", ["tree", "decisions", "measured", "model"], rows, "lrrr")
+    fl = next((r for r in sc if r["name"] == "flop, 1 size per street"), None)
+    if fl:
+        mac("FlopShowLeaves", f"{fl['showLeaves']:,}".replace(",", "{,}"))
+    mac("CostAraw", f"{1e6 * coef[0]:.1f}")
+rf = load("roofline")
+if rf:
+    mac("RoofUpdNs", f"{rf['updateNsPerEntry']:.1f}")
+    mac("RoofCopyGBs", f"{rf['copyGBs']:.1f}")
+    if sc and "foldWork" in sc[0]:
+        mac("RoofRatio", f"{1e6 * coef[0] / rf['updateNsPerEntry']:.0f}")
+
+# precision, four combinations
+pr = load("precision")
+if pr and "R32 S32" in next(iter(pr.values())):
+    fig, ax = plt.subplots(figsize=(3.7, 2.7))
+    cols = {"R32 S32": "#1BAF7A", "R64 S64": "#2A78D6", "R32 S64": "#EB6834", "R64 S32": "#EDA100"}
+    for name, d in pr.items():
+        ls = "-" if "small" in name else "--"
+        for k, c in cols.items():
+            pts = d[k]
+            ax.loglog([p[0] for p in pts], [p[1] for p in pts], color=c, ls=ls, lw=1.3, label=k if "small" in name else None)
+    ax.set_xlabel("iterations")
+    ax.set_ylabel("exploitability, % of pot")
+    ax.legend(fontsize=7)
+    fig.tight_layout()
+    fig.savefig(figs / "precision.pdf")
+    plt.close(fig)
+    small = pr["small turn game"]
+    fin = [small[k][-1][1] for k in cols]
+    mac("PrecFloor", "$" + sci(min(fin), 0) + "$")
+    mac("PrecDiff", "$" + sci(small["weightedStrategyDiff"], 1) + "$" + (" on the small game and $" + sci(pr["turn spot"]["weightedStrategyDiff"], 1) + "$ on the turn spot" if "turn spot" in pr and "weightedStrategyDiff" in pr["turn spot"] else ""))
+
+# parallel with the model
+pa = load("parallel")
+if pa:
+    rows = []
+    for spot in ("turn", "flop"):
+        rs = {r["K"]: r for r in pa["rows"] if r["spot"] == spot}
+        if 1 not in rs:
+            continue
+        K = 48 - (4 if spot == "turn" else 3)          # first-level cards once both hands are known (approximately)
+        Kc = 52 - (4 if spot == "turn" else 3)
+        tc = rs[1]["coordMsPerPass"] * 2
+        t1 = (rs[1]["msPool"] - tc) / Kc
+        model = lambda P: tc + math.ceil(Kc / P) * t1
+        row = [spot, f"{rs[1]['msSeq']:.0f}", f"{rs[1]['msPool']:.0f}"]
+        if 2 in rs:
+            row += [f"{rs[2]['msPool']:.0f}", f"{model(2):.0f}", f"{rs[1]['msSeq'] / rs[2]['msPool']:.2f}"]
+        rows.append(row)
+        if spot == "flop":
+            mac("ParPredEight", f"{model(8):.0f}")
+    table("parallel_table", ["spot", "seq.", "$P=1$", "$P=2$", "model", "speedup"], rows, "lrrrrr")
+    mac("ParCores", str(pa["cores"]))
+    mac("ParBytes", f"{max(r['bytesPerPassPerWorker'] for r in pa['rows']) / 1024:.0f} kB")
+    rel = [abs(r["explSeq"] - r["explPool"]) / abs(r["explSeq"]) for r in pa["rows"]]
+    mac("ParAgree", "$" + sci(max(max(rel), 1e-16), 0) + "$" if max(rel) > 0 else "all printed digits")
+
+# validation numbers
+ro, tl, fp = load("river_old"), load("turn_lp"), load("flop_lp")
+if ro:
+    mac("RiverOldNew", "$" + sci(ro["newExpl"], 2) + "$"); mac("RiverOldOld", "$" + sci(ro["oldExpl"], 2) + "$")
+if tl:
+    mac("TurnLP", f"{tl['lp']:.8f}"); mac("TurnJS", f"{tl['js'][-1]['value0']:.8f}"); mac("TurnHands", f"{tl['hands'][0]} and {tl['hands'][1]}")
+if fp:
+    mac("FlopLP", f"{fp['lp']:.6f}"); mac("FlopJS", f"{fp['js'][-1]['value0']:.6f}"); mac("FlopHands", f"{fp['hands'][0]} and {fp['hands'][1]}")
+
+# lock
+lk = load("lock")
+if lk and "itBefore" in lk:
+    mac("LockItBefore", str(lk["itBefore"])); mac("LockItAfter", str(lk["itAfter"]))
+    mac("LockValAfter", f"{lk['valAfter']:.1f}"); mac("LockValBefore", f"{lk['base']['val'][0]:.1f}")
+    mac("LockFoldAfter", f"{100 * lk['after']['oop'][lk['foldIdx']]:.0f}\\%")
+    mac("LockFoldBefore", f"{100 * lk['before']['oop'][lk['foldIdx']]:.0f}\\%")
+    mac("LockBetBefore", f"{100 * lk['before']['ip'][lk['betIdx']]:.0f}\\%")
+
+# report with collapsed-strata standard errors
+rp = load("reportsub")
+if rp and rp["rows"] and "flops" in rp["rows"][0]:
+    rows = []
+    for r in rp["rows"]:
+        fl = r["flops"]
+        W = sum(f["w"] for f in fl)
+        def est(key):
+            m = sum(f["w"] * f[key] for f in fl) / W
+            # collapsed strata: neighbouring pieces of the same group are paired
+            var = 0.0
+            bygroup = {}
+            for f in fl:
+                bygroup.setdefault(f["group"], []).append(f)
+            for g in bygroup.values():
+                for i in range(0, len(g) - 1, 2):
+                    a, b = g[i], g[i + 1]
+                    var += ((a["w"] + b["w"]) / W) ** 2 * (a[key] - b[key]) ** 2 / 4
+            return m, math.sqrt(var)
+        v, ve = est("val0")
+        b_, be = est("oopBet")
+        rows.append([str(r["n"]), pm(v, ve, 3), pm(100 * b_, 100 * be, 1) + "\\%"])
+    table("report_table", ["flops", "big blind value", "big blind bets"], rows, "rrr")
+
+# preflop sensitivity
+ps = load("pf_sens")
+if ps:
+    mac("SensRms", "$" + sci(ps["rmsTableDiff"], 1) + "$"); mac("SensMax", "$" + sci(ps["maxTableDiff"], 1) + "$")
+    rows = [[f"{r['stack']} bb", f"{r['valA']:.5f}", f"{r['valB']:.5f}", f"{abs(r['valA'] - r['valB']):.1e}", f"{100 * abs(r['pushA'] - r['pushB']):.2f}", f"{2 * r['stack'] * ps['maxTableDiff']:.2f}"] for r in ps["rows"]]
+    table("sens_table", ["stack", "value, table 1", "value, table 2", "difference", "push, points", "bound $\\delta$"], rows, "rrrrrr")
+lr = load("lowrank")
+if lr:
+    table("lowrank_table", ["$R$", "slice error", "contraction error"], [[str(r["rank"]), f"${sci(r['sliceError'], 1)}$", f"${sci(r['contractionError'], 1)}$"] for r in lr["rows"] if r["rank"] in (1, 4, 8, 16, 32)], "rrr")
+    mac("LowRankErr", "$" + sci(next(r for r in lr["rows"] if r["rank"] == 16)["contractionError"], 1) + "$")
+
+# placeholders for anything still missing, so that the deck compiles
+needed = ["FlopInfosets", "CostA", "CostB", "CostC", "CostD", "CostTrees", "CostResid", "FlopShowLeaves", "RoofUpdNs", "RoofCopyGBs", "RoofRatio",
+          "PrecFloor", "PrecDiff", "ParCores", "ParBytes", "ParAgree", "ParPredEight", "RiverOldNew", "RiverOldOld", "TurnLP", "TurnJS", "TurnHands",
+          "FlopLP", "FlopJS", "FlopHands", "LockItBefore", "LockItAfter", "LockValAfter", "LockValBefore", "LockFoldAfter", "LockFoldBefore",
+          "LockBetBefore", "SensRms", "SensMax", "LowRankErr", "DDensity", "ConvSlopes", "LeafErr"]
+for k in needed:
+    macros.setdefault(k, "??")
+for t in ("tol_table", "cost_table", "sens_table", "report_table"):
+    if not (data / f"{t}.tex").exists():
+        (data / f"{t}.tex").write_text("\\textit{pending}\n")
 (data / "numbers2.tex").write_text("".join(f"\\newcommand{{\\{k}}}{{{v}}}\n" for k, v in sorted(macros.items())))
-print("\n".join(f"{k} = {v}" for k, v in sorted(macros.items())))
+missing = [k for k in needed if macros[k] == "??"]
+print("missing:", missing)

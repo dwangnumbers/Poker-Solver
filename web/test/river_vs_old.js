@@ -12,3 +12,7 @@ const a = s.analyse([]); console.log('root freqs', a.freq.map(x => x.toFixed(3))
 const go = O.createGame({ board, pot: 100, stack: 100, bets: [[.33,.75],[.33,.75]], raises: [1], maxRaises: 2, weights: [O.parseRange(O.BB_CALL), O.parseRange(O.BTN_OPEN)] });
 const so = new O.Solver(go, 'dcfr'); for (let i = 0; i < 5000; i++) so.step();
 console.log('old expl', so.exploitability().toExponential(4), 'old Z', go.Z, 'decisions', go.decisions.length);
+// game values of both after 5000 iterations, written for the talk
+const r = s.evaluate();
+let v0 = null; try { v0 = so.value ? so.value() : null; } catch (e) { }
+require('fs').writeFileSync(__dirname + '/../experiments/out/river_old.json', JSON.stringify({ hands: g.n, decisions: g.decisions.length, newExpl: r.expl, newVal0: r.val[0], oldExpl: so.exploitability() }));

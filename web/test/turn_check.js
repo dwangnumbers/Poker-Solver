@@ -13,5 +13,8 @@ const tree = { streets: { flop: { oop: { bet: [] }, ip: { bet: [] } },
   turn: { oop: { bet: [50] }, ip: { bet: [50] } }, river: { oop: { bet: [100] }, ip: { bet: [100] } } }, maxBets: 1, allinThreshold: 2, mergeTolerance: 0 };
 const g = E.buildGame({ board: bc, pot: 100, stack: 1000, ranges, tree });
 const s = new E.Solver(g);
-for (const T of [2000, 20000]) { s.iterate(T - s.t); const r = s.evaluate(); console.log('JS', T, 'value0', r.val[0].toFixed(8), 'expl', r.expl.toExponential(3), 'Z', g.Z); }
-console.log('LP', execSync('python3 /home/claude/poker-solver/web/test/turn_lp.py /tmp/turn_cfg.json').toString().trim());
+const out = { hands: H.map(l => l.length), decisions: g.decisions.length, js: [] };
+for (const T of [2000, 20000]) { s.iterate(T - s.t); const r = s.evaluate(); out.js.push({ T, value0: r.val[0], expl: r.expl }); console.log('JS', T, 'value0', r.val[0].toFixed(8), 'expl', r.expl.toExponential(3), 'Z', g.Z); }
+const lp = JSON.parse(execSync('python3 ' + __dirname + '/turn_lp.py /tmp/turn_cfg.json').toString()); out.lp = lp.value0;
+console.log('LP', lp.value0.toFixed(9));
+fs.writeFileSync(__dirname + '/../experiments/out/turn_lp.json', JSON.stringify(out));
