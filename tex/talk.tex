@@ -22,6 +22,7 @@
 \usetikzlibrary{arrows.meta,positioning,calc,shapes.geometric,fit,backgrounds,decorations.pathreplacing}
 \usepackage{graphicx}
 \usepackage{fancyvrb}
+\usepackage{pifont}
 \graphicspath{{../figs/}}
 \input{numbers.tex}
 
@@ -37,6 +38,7 @@
 \definecolor{lightblue}{HTML}{CDE2FB}
 \definecolor{lightgray}{HTML}{E4E3DF}
 \definecolor{felt}{HTML}{1F6B4A}
+\definecolor{rail}{HTML}{4A2F1B}
 \definecolor{suitred}{HTML}{C8102E}
 \definecolor{suitblue}{HTML}{1C5CAB}
 \definecolor{suitgreen}{HTML}{147A3A}
@@ -54,15 +56,12 @@
 \newcommand{\src}[1]{{\par\vfill\hfill\tiny\color{ink2}#1}}
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\ex}{\operatorname{expl}}
-\newcommand{\tagP}{\tikz[baseline=-0.6ex]\node[fill=felt,text=white,rounded corners=1.5pt,inner sep=1.6pt,font=\tiny\bfseries]{POKER};}
-\newcommand{\tagM}{\tikz[baseline=-0.6ex]\node[fill=cblue,text=white,rounded corners=1.5pt,inner sep=1.6pt,font=\tiny\bfseries]{MATH};}
-\newcommand{\tagO}{\tikz[baseline=-0.6ex]\node[fill=corange,text=white,rounded corners=1.5pt,inner sep=1.6pt,font=\tiny\bfseries]{NEW};}
 
 % ---------- playing cards (four-colour deck) ----------
 \colorlet{suit-s}{ink}\colorlet{suit-h}{suitred}\colorlet{suit-d}{suitblue}\colorlet{suit-c}{suitgreen}
 \newcommand{\suitsym}[1]{\ensuremath{\csname suit@#1\endcsname}}
 \makeatletter
-\def\suit@s{\spadesuit}\def\suit@h{\heartsuit}\def\suit@d{\diamondsuit}\def\suit@c{\clubsuit}
+\def\suit@s{\spadesuit}\def\suit@h{\text{\ding{170}}}\def\suit@d{\text{\ding{169}}}\def\suit@c{\clubsuit}
 \makeatother
 \newcommand{\pcard}[3][1]{% [scale]{rank}{suit}
   \tikz[baseline=-0.7ex]{\node[draw=ink2,fill=white,rounded corners=2.5pt,minimum width=#1*0.62cm,
@@ -90,14 +89,14 @@ If running late, shorten the demonstration to its five minute version (see \text
 Opening line: ``Ten years ago the best poker players in the world lost to programs whose core is a few lines of
 arithmetic repeated a few billion times. This talk is about that arithmetic, read as numerical analysis, and about
 what a numerical analyst can add to it.''\\[4pt]
-The slides alternate between \textsc{poker} (green tag) and \textsc{math} (blue tag). The orange tag \textsc{new} marks
-our own contribution. Every number that we computed comes from the Python solver in the repository. The more detailed
+The talk alternates between poker and mathematics, and our own contribution comes in the last third. On the plan slide
+the poker parts are green, the mathematics blue and the new method orange. Every number that we computed comes from the Python solver in the repository. The more detailed
 version of this deck, with all citations and extra slides, is \texttt{talk-detailed.pdf}.
 }
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagP\ Ten years of superhuman poker}
+\begin{frame}{Ten years of superhuman poker}
 \begin{columns}[T]
 \column{0.58\textwidth}
 In 2015 a program called Cepheus essentially solved two-player limit hold'em.
@@ -160,7 +159,7 @@ from the numerical optimisation toolbox, with honest results: where it wins by o
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagP\ Texas hold'em in one slide}
+\begin{frame}{Texas hold'em in one slide}
 \begin{columns}[T]
 \column{0.5\textwidth}
 Each of the two players is dealt two private cards. Five public cards, the \emph{board}, are then revealed in three
@@ -175,13 +174,15 @@ If nobody folds, the best five-card hand made from the seven available cards win
 \column{0.48\textwidth}
 \centering
 \begin{tikzpicture}
-  \fill[felt,rounded corners=28pt] (-3.2,-1.9) rectangle (3.2,1.9);
-  \node at (0,0.55) {\pcard{K}{s}\,\pcard{7}{d}\,\pcard{2}{c}\,\pcard{T}{h}\,\pcard{4}{s}};
-  \node[text=white,font=\small] at (0,-0.25) {pot $= 100$, stacks $= 100$};
-  \node at (-1.7,-1.0) {\cardback\,\cardback};
-  \node at (1.7,-1.0) {\cardback\,\cardback};
-  \node[text=white,font=\scriptsize] at (-1.7,-1.6) {Big blind (OOP)};
-  \node[text=white,font=\scriptsize] at (1.7,-1.6) {Button (IP)};
+  \fill[rail,rounded corners=1.95cm] (-3.45,-1.95) rectangle (3.45,1.95);
+  \fill[felt,rounded corners=1.72cm] (-3.22,-1.72) rectangle (3.22,1.72);
+  \draw[white,opacity=0.18,rounded corners=1.5cm] (-3.0,-1.5) rectangle (3.0,1.5);
+  \node at (0,0.62) {\pcard{K}{s}\,\pcard{7}{d}\,\pcard{2}{c}\,\pcard{T}{h}\,\pcard{4}{s}};
+  \node[text=white,font=\small] at (0,-0.12) {pot $= 100$, stacks $= 100$};
+  \node at (-1.55,-0.78) {\cardback\,\cardback};
+  \node at (1.55,-0.78) {\cardback\,\cardback};
+  \node[text=white,font=\scriptsize] at (-1.55,-1.3) {Big blind (OOP)};
+  \node[text=white,font=\scriptsize] at (1.55,-1.3) {Button (IP)};
 \end{tikzpicture}\\[4pt]
 {\small Our running example is the \alert{river}, the last round of betting.\\
 The big blind acts first, which is called being out of position.}
@@ -198,7 +199,7 @@ The live demonstration uses exactly this table.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagP\ Ranges: what a solver takes as input}
+\begin{frame}{Ranges: what a solver takes as input}
 \begin{columns}[T]
 \column{0.6\textwidth}
 \centering
@@ -225,7 +226,7 @@ are fewer hands with a king.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagM\ Two-player zero-sum games and Nash equilibrium}
+\begin{frame}{Two-player zero-sum games and Nash equilibrium}
 Each player chooses a strategy from a compact convex set, $x\in X$ and $y\in Y$, and the first player receives the
 bilinear payoff $x^\top A y$ from the second.
 \begin{block}{Minimax theorem (von Neumann 1928)}
@@ -246,7 +247,7 @@ Our numbers are in chips with a pot of 100, so $10^{-2}$ chips is $10^{-4}$ of t
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagP\ Why equilibria mix: bluffing and pot odds}
+\begin{frame}{Why equilibria mix: bluffing and pot odds}
 \begin{columns}[T]
 \column{0.56\textwidth}
 Take a toy river with a pot of 1. The bettor holds either the best hand or nothing and bets $s$. The caller holds a
@@ -284,7 +285,7 @@ complementary slackness in the linear program that we are about to write down. M
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagM\ Games on trees with hidden information}
+\begin{frame}{Games on trees with hidden information}
 \begin{columns}[T]
 \column{0.52\textwidth}
 Poker is a game tree. Chance deals the cards, the players act in turn, and the leaves carry the payoffs.
@@ -310,15 +311,18 @@ No-limit hold'em & about $10^{161}$ \\ \bottomrule
    every node/.style={font=\scriptsize}]
   \node[circle,fill=ink2,text=white,inner sep=1.5pt] {C}
     child { node[circle,draw=cblue,fill=cblue!15,inner sep=2pt] (a) {1}
-       child { node[circle,draw=corange,fill=corange!15,inner sep=2pt] (b1) {2} child{node{$+1$}} child{node{$-2$}} }
-       child { node[circle,draw=corange,fill=corange!15,inner sep=2pt] (b2) {2} child{node{$+1$}} child{node{$+2$}} } }
+       child { node[circle,draw=corange,fill=corange!15,inner sep=2pt] (b1) {2} child{node{$+1$}} child{node{$-2$}}
+               edge from parent node[left,font=\tiny,text=ink2] {check} }
+       child { node[circle,draw=corange,fill=corange!15,inner sep=2pt] (b2) {2} child{node{$+1$}} child{node{$+2$}}
+               edge from parent node[right,font=\tiny,text=ink2] {bet} } }
     child { node[circle,draw=cblue,fill=cblue!15,inner sep=2pt] (c) {1}
-       child { node[circle,draw=corange,fill=corange!15,inner sep=2pt] (d1) {2} child{node{$+1$}} child{node{$+2$}} }
-       child { node[circle,draw=corange,fill=corange!15,inner sep=2pt] (d2) {2} child{node{$-1$}} child{node{$-2$}} } };
-  \draw[corange,dashed,thick,rounded corners] ($(b1)+(-0.25,0.25)$) -- ($(d1)+(0.25,0.25)$) -- ($(d1)+(0.25,-0.25)$) -- ($(b1)+(-0.25,-0.25)$) -- cycle;
-  \node[corange,font=\scriptsize] at ($(b1)!0.5!(d1)+(0,-0.42)$) {one information set};
+       child { node[circle,draw=corange,fill=corange!15,inner sep=2pt] (d2) {2} child{node{$-1$}} child{node{$-2$}}
+               edge from parent node[left,font=\tiny,text=ink2] {bet} }
+       child { node[circle,draw=corange,fill=corange!15,inner sep=2pt] (d1) {2} child{node{$+1$}} child{node{$+2$}}
+               edge from parent node[right,font=\tiny,text=ink2] {check} } };
+  \draw[corange,dashed,thick,rounded corners=4pt] ($(b2)+(-0.24,0.24)$) rectangle ($(d2)+(0.24,-0.24)$);
 \end{tikzpicture}\\[2pt]
-{\scriptsize Player 2 sees the action of player 1 but not the deal.}
+{\scriptsize Player 2 sees that player 1 bet but not which card was dealt, so the two boxed nodes are one information set.}
 \end{columns}
 \note{
 Leduc hold'em is the standard research benchmark. It has a deck of six cards, one private
@@ -331,7 +335,7 @@ Kuhn and Leduc were counted by our code.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagM\ The sequence form: equilibrium is a linear program}
+\begin{frame}{The sequence form: equilibrium is a linear program}
 Give player 1 one variable $x_\sigma$ for each \emph{sequence} $\sigma$ of her own
 actions, equal to the product of her probabilities along it. These variables satisfy linear flow constraints
 $Ex = e$, $x\ge 0$, and the expected payoff is bilinear in them, $u(x,y) = x^\top A y$.
@@ -355,7 +359,7 @@ problems the LP is perfectly fine: 0.04 s on Leduc and 1.6 s on a small river. T
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagM\ Regret matching}
+\begin{frame}{Regret matching}
 \begin{columns}[T]
 \column{0.62\textwidth}
 We face the same decision many times. The \emph{regret} $R_T(a)$ of an action is how much better it would have done
@@ -382,7 +386,7 @@ In the figure the limit is $(\frac14,\frac12,\frac14)$.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagM\ Counterfactual regret minimisation (CFR)}
+\begin{frame}{Counterfactual regret minimisation (CFR)}
 CFR runs regret matching separately at every information set $I$. The payoff it feeds to each one is the
 \textbf{counterfactual value} of an action, which is the expected payoff weighted by the probability that the opponent and
 chance lead to $I$, as if the player herself had tried to get there.
@@ -403,7 +407,7 @@ These are the same two products that any first-order saddle-point method needs.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagP\tagM\ CFR for poker: one pass for all hands}
+\begin{frame}{CFR for poker: one pass for all hands}
 In poker the betting is public and only the cards are hidden. At each point of the betting we store
 \emph{vectors} indexed by hands, such as the reach probabilities $\pi_1$ and $\pi_2$.
 At a leaf the values of all hands come from one matrix-vector product.
@@ -427,7 +431,7 @@ scalable Newton method would have to exploit, which comes back at the end of the
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagM\ Four variants of one loop}
+\begin{frame}{Four variants of one loop}
 Modern solvers change how CFR weights the old regrets and how it averages the strategies.
 
 \smallskip
@@ -454,14 +458,16 @@ theory is an open question. The rates are still sublinear, and that is the gap o
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagP\tagM\ Live demonstration: the river solver table}
-\begin{columns}[c]
-\column{0.55\textwidth}
+\begin{frame}{Live demonstration: the river solver table}
+\begin{columns}[T]
+\column{0.61\textwidth}
 \centering
-\includegraphics[width=\linewidth]{app_slide.png}
-\column{0.43\textwidth}
+\includegraphics[width=\linewidth]{app_slide.png}\\[3pt]
+{\scriptsize The big blind's answer to a three-quarter-pot bet. Each square is a starting hand; blue folds, green calls, red raises all-in.}
+\column{0.37\textwidth}
+\small
 The page \texttt{app/poker-solver.html} solves our river in the browser. It will answer five questions.
-\begin{enumerate}\small\setlength\itemsep{2pt}
+\begin{enumerate}\setlength\itemsep{1pt}
 \item Which of the four algorithms wins a race?
 \item What does the big blind do with each of its 473 hands?
 \item How do the ranges and the tree change as the hand is played?
@@ -485,7 +491,7 @@ If the browser fails, the static grids are in \texttt{talk-detailed.pdf}, slides
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagP\ What the demonstration showed}
+\begin{frame}{What the demonstration showed}
 \begin{columns}[T]
 \column{0.42\textwidth}
 The solution reads like poker. Strong hands bet, a few hands with nothing bluff, and the hands in between check.
@@ -494,8 +500,8 @@ The solution reads like poker. Strong hands bet, a few hands with nothing bluff,
 A hand that mixes two actions gets the same value from both. This is complementary slackness.
 
 \medskip
-The button defends within 1.5 points of the pot odds formula. The big blind folds much more than the formula says,
-because the button's bluffs would still win some showdowns by checking.
+Against the big blind's bets the button defends within 1.5 points of the pot odds formula. Against the button's bets
+and against all-in raises the defender folds much more, because there the bluffs give up something by betting.
 \column{0.57\textwidth}
 \centering
 {\scriptsize\setlength\tabcolsep{3pt}
@@ -506,14 +512,15 @@ because the button's bluffs would still win some showdowns by checking.
 This is a consistency check of the whole pipeline. When the big blind bets, the button defends 74.3\% against 75.2\%, 55.8\% against
 57.1\% and 49.1\% against 50.0\%, so the toy formula is almost exact. When the button bets after a check, the big blind folds much
 more. We checked that the button's weakest betting hands mix between checking and going all-in, so the indifference that fixes
-the defence frequency is ``value of the all-in equals value of checking, which is positive'' and not ``value of the all-in equals zero''.\\[3pt]
+the defence frequency is ``value of the all-in equals value of checking, which is positive'' and not ``value of the all-in equals zero''.\ The all-in raises (the rows with $s=0.10$ and $s=0.40$) fail the formula for the same reason. A bluff-raise gives up the value of
+simply calling, and the raising range is mostly strong hands.\\[3pt]
 The numbers in the table come from the exact equilibrium computed by the method of the next part, so they can differ in the last digit from what the
 browser showed after 1000 iterations.
 }
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagM\ Why push the precision further?}
+\begin{frame}{Why push the precision further?}
 \begin{columns}[T]
 \column{0.58\textwidth}
 Practical solvers stop at about 0.1\% of the pot, and for a human studying a hand that is plenty.
@@ -540,7 +547,7 @@ Numbers for Leduc: CFR$^+$ reaches $\LeducCFRplusLong$ after 50{,}000 iterations
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ Step 1: write the equilibrium as a variational inequality}
+\begin{frame}{Step 1: write the equilibrium as a variational inequality}
 Collect both strategies and both vectors of information-set values in one unknown $z = (x, y, p, q)$. An
 equilibrium is a point that satisfies the optimality conditions of both players' linear programs.
 \[
@@ -568,7 +575,7 @@ The details are in \texttt{talk-detailed.pdf}.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ Step 2: the proximal point method makes each problem well posed}
+\begin{frame}{Step 2: the proximal point method makes each problem well posed}
 We add a small multiple of the identity. Given $z^k$, the next iterate $z^{k+1}$ solves the same conditions with
 \[ w_\rho(z) = (M + \rho I)\,z + b - \rho\, z^{k} . \]
 \begin{columns}[T]
@@ -599,7 +606,7 @@ nearly as ill posed as the original one, since $\|(M+\rho I)^{-1}\|\le 1/\rho$. 
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ Step 3: Newton's method on a piecewise-linear equation}
+\begin{frame}{Step 3: Newton's method on a piecewise-linear equation}
 Each regularised problem can be written as one equation. For every action, either its probability is zero or its
 reduced cost is zero, and that is the same as $\min\big(x_i,\ w_\rho(z)_i\big)=0$.
 
@@ -624,7 +631,7 @@ took steps of size $10^{-3}$ for dozens of iterations. That pushed us to the int
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ Step 4: making it robust and fast}
+\begin{frame}{Step 4: making it robust and fast}
 \begin{columns}[T]
 \column{0.55\textwidth}
 \textbf{A robust start.} The first regularised problem is the hardest. We solve it with an interior-point method
@@ -661,7 +668,7 @@ pivoted sparse LU, which is cheap because the active-set system lives on the sup
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagP\tagO\ Step 5: restrict to the support, solve exactly, then verify}
+\begin{frame}{Step 5: restrict to the support, solve exactly, then verify}
 \begin{columns}[T]
 \column{0.54\textwidth}
 On larger hands the method so far fails. Many actions are never played and many positions are never
@@ -700,7 +707,7 @@ problem had about 35\% of the unknowns of the full one.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ Result on the benchmark game, Leduc hold'em}
+\begin{frame}{Result on the benchmark game, Leduc hold'em}
 \begin{columns}[c]
 \column{0.6\textwidth}
 \includegraphics[width=\linewidth]{hybrid_leduc.pdf}
@@ -724,7 +731,7 @@ the LP does not fit, which is the next slide.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ Result on the river from the demonstration}
+\begin{frame}{Result on the river from the demonstration}
 \begin{columns}[T]
 \column{0.52\textwidth}
 \includegraphics[width=\linewidth]{hybrid_medium.pdf}\\
@@ -754,7 +761,7 @@ On the small river (147 against 139 hands) the method reaches $\SuppSmallExpl$ i
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ Where it stops winning, and what is open}
+\begin{frame}{Where it stops winning, and what is open}
 \begin{block}{Full ranges: all 1{,}081 hands for both players, 47{,}568 unknowns}
 \small The restricted problem still has 43\% of the unknowns and one factorisation takes about 10 seconds. After 80 minutes our
 method is at $4.1\times10^{-6}$ chips. DCFR reaches $9.5\times10^{-6}$ in 10 minutes. \textbf{Here CFR wins.}
@@ -782,7 +789,7 @@ solver for the Newton systems would need. Hierarchical factorisations of the blo
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{\tagO\ What is new here, and what is not}
+\begin{frame}{What is new here, and what is not}
 The ingredients are classical: the sequence form, the proximal point method, semismooth Newton,
 interior point with crossover, quasi-definite factorisations and the CFR family.
 
