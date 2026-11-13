@@ -80,7 +80,7 @@ plt.close(fig)
 by = {}
 for key, name, s in slopes:
     by.setdefault(name, []).append(f"{s:.2f}")
-macros["ConvSlopes"] = "; ".join(f"{n} {', '.join(v)}" for n, v in by.items()) + " (river, turn, flop)"
+macros["ConvSlopes"] = "; ".join(f"{n.replace('+', '$^+$')} ${', '.join(v)}$" for n, v in by.items()) + " for river, turn and flop"
 
 # ---- leaf cost
 lc = load("leafcost")
@@ -156,7 +156,7 @@ if lk:
     macros["LockFoldAfter"] = f"{100 * a['oop'][fi]:.1f}\\%"
     macros["LockValBefore"] = f"{lk['base']['val'][0]:.2f}"
     macros["LockValAfter"] = f"{lk['pts'][-1][2]:.2f}"
-    macros["LockBetLabel"] = b["acts"][bi]
+    macros["LockBetLabel"] = "bet a third of the pot"
 
 # ---- report subsets
 rp = load("reportsub")

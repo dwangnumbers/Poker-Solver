@@ -311,8 +311,10 @@ The last term restores the opponent hand equal to $h$, which was subtracted twic
 The 52 card sums cost $O(n)$, and so does the evaluation for all $h$. The direct sum costs $O(n^2)$.
 
 \medskip
-In matrix form the fold block is $\mathbf 1\mathbf 1^\top$ minus a sparse correction with one row and one column per
-card, a rank-one plus sparse structure.
+In matrix form the compatibility matrix is
+\[ C = \mathbf 1\mathbf 1^\top - \sum_{c=1}^{52} e_c f_c^\top + P , \]
+where $e_c$ and $f_c$ indicate the hands containing card $c$ and $P$ matches identical hands: rank at most 53 plus a
+partial permutation.
 \note{
 Inclusion--exclusion over the two cards of $h$. Two different two-card hands share at most one card, except the identical hand,
 which shares both and is counted in both $C(h_1)$ and $C(h_2)$. Adding it back gives the exact count.\\[3pt]
@@ -398,9 +400,9 @@ Building one card's subtree and multiplying by the number of cards is exact up t
 Regrets and strategy sums are stored in single precision; all arithmetic inside a traversal is double precision.
 
 \medskip
-Discounting bounds the stored magnitudes: positive regrets are scaled by $t^{1.5}/(t^{1.5}+1)$ and the average weights
-by $(t/(t+1))^2$, so no quantity grows like $t$. The rounding error of each update is relative,
-$|\mathrm{fl}(s)-s|\le 2^{-24}|s|$.
+Each update has relative rounding error $u = 2^{-24}\approx 6\times10^{-8}$. Under DCFR the strategy sum grows like
+$t/3$ and the new term has relative size about $3/t$, so it is resolved while $3/t \gg u$, that is for
+$t \ll 10^{7}$. Regrets grow like $\sqrt t$ and are resolved for longer.
 
 \medskip
 The two storage precisions give exploitabilities within 10\% of each other down to $10^{-2}$\% of the pot, ten
@@ -412,12 +414,12 @@ gain.
 {\scriptsize Exploitability against iterations with single and double precision storage.}
 \end{columns}
 \note{
-Half the memory for the same practical result. The stall of single precision in long runs is visible on the small game, where it reaches
+The strategy sum with weights $(k/t)^2$ is $\sum_{k\le t}(k/t)^2 w_k \approx t/3$ for bounded $w_k$. Half the memory for the same practical result. The stall of single precision in long runs is visible on the small game, where it reaches
 \PrecSmallFthirtytwo\% of the pot after 30{,}000 iterations against \PrecSmallFsixtyfour\% in double precision. On the turn spot the two curves are
 indistinguishable over 400 iterations (\PrecTurnFthirtytwo\% and \PrecTurnFsixtyfour\%).\\[3pt]
 The reason single precision suffices: the strategy is a ratio of sums, so relative errors of the sums enter the strategy as relative
-errors of size $2^{-24}$ per update. With uniform averaging the sums grow like $t$ and each new term is relatively tiny, which is where
-single precision would lose information; the DCFR weights keep the newest terms relevant.
+errors of size $u$ per update, and a new term is lost only when its relative size falls below $u$. The differences between the two curves
+at moderate accuracy are of both signs; they come from the iteration amplifying rounding differences, not from a precision floor.
 }
 \end{frame}
 
@@ -538,6 +540,8 @@ big blind value per hand & \LockValBefore & \LockValAfter \\ \bottomrule
 \end{tabular}
 \end{center}}
 \note{
+In the equilibrium the button never bets a third of the pot after a check (it checks or moves all-in), so the big blind's 49\% fold is
+an off-path response: what the solver would do if that bet appeared. The lock puts the line on the path, and the big blind folds far less.\\[3pt]
 Locking answers the practical question: what is the best response to a known mistake, while every other node also adapts. It is a
 partial best response, more stable than a full best response because the rest of the tree is still solved jointly.\\[3pt]
 The example: a button who always bets can be called much more widely, and the big blind's value rises. The big blind's root strategy

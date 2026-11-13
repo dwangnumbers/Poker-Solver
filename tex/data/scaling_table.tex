@@ -1,12 +1,12 @@
-\begin{tabular}{lrrrr}
+\begin{tabular}{lrrrrr}
 \toprule
-tree & decisions & $\sum n_p|A|$ & MB & ms per iteration \\ \midrule
-river, 1 size & 4 & 3,508 & 0.03 & 0.9 \\
-river, 2 sizes, raises & 8 & 8,770 & 0.07 & 0.4 \\
-turn, 1 size & 580 & $5.3\times10^{5}$ & 4 & 23 \\
-turn, raises and all-in & 2,216 & $2.4\times10^{6}$ & 20 & 97 \\
-flop, checked down later & 8 & 9,480 & 0.08 & 269 \\
-flop, 1 size per street & 56,842 & $5.4\times10^{7}$ & 431 & 1759 \\
-flop, standard & 85,263 & $8.1\times10^{7}$ & 647 & 1743 \\
+tree & decisions & $\sum n_p|A|$ & MB & ms per iteration & ns per entry \\ \midrule
+river, 1 size & 4 & 3,508 & 0.03 & 0.9 & 249 \\
+river, 2 sizes, raises & 8 & 8,770 & 0.07 & 0.4 & 43 \\
+turn, 1 size & 580 & $5.3\times10^{5}$ & 4 & 23 & 42 \\
+turn, raises and all-in & 2,216 & $2.4\times10^{6}$ & 20 & 97 & 40 \\
+flop, checked down later & 8 & 9,480 & 0.08 & 269 & 28394 \\
+flop, 1 size per street & 56,842 & $5.4\times10^{7}$ & 431 & 1759 & 33 \\
+flop, standard & 85,263 & $8.1\times10^{7}$ & 647 & 1743 & 22 \\
 \bottomrule
 \end{tabular}

@@ -89,7 +89,7 @@
         dec += (one.decisions.length - top.decisions.length) * K; mem += (one.memBytes - top.memBytes) * K;
       }
       const big = mem > 3e9;
-      $('estimate').innerHTML = `Hands in range <b>${top.n[0]}</b> OOP and <b>${top.n[1]}</b> IP. About <b>${dec.toLocaleString()}</b> decision nodes and <b class="${big ? 'warn' : ''}">${(mem / 1e6).toFixed(0)} MB</b> of regrets and strategy sums${big ? ', which is more than most browsers allow. Use fewer sizes' : ''}.`;
+      $('estimate').innerHTML = `Hands in range <b>${top.n[0]}</b> OOP and <b>${top.n[1]}</b> IP. About <b>${dec.toLocaleString()}</b> decision nodes and <b class="${big ? 'warn' : ''}">${mem < 1e7 ? (mem / 1e6).toFixed(2) : (mem / 1e6).toFixed(0)} MB</b> of regrets and strategy sums${big ? ', which is more than most browsers allow. Use fewer sizes' : ''}.`;
       return { dec, mem };
     } catch (e) { $('estimate').innerHTML = `<span class="warn">${esc(e.message)}</span>`; return null; }
   }

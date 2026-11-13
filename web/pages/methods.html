@@ -3,7 +3,8 @@
 <section class="panel prose">
 <h2 style="margin-top:4px">What the solver computes</h2>
 <p>A spot is a two-player zero-sum game: a board, a pot, an effective stack, a range for each player and a tree of allowed bet sizes. The solver returns an average strategy profile whose exploitability, the mean gain of the two best responses, is reported as a percentage of the pot.</p>
-<div class="eq">expl(σ) = ½ [ max_σ0' u0(σ0', σ1) + max_σ1' u1(σ0, σ1') ]  ( = ½ Σ_p (BR_p − v_p) with rake )</div>
+<div class="eq">expl(σ) = ½ [ max_σ0' u0(σ0', σ1) + max_σ1' u1(σ0, σ1') ]
+        = ½ Σ_p (BR_p − v_p)      (the second form also holds with rake)</div>
 <p>All pages run in your browser. Nothing is sent to a server.</p>
 
 <h2>Discounted CFR</h2>

@@ -29,6 +29,7 @@ def head(title, current):
     return ("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n"
             f"<title>{title} · DCFR poker solver</title>\n{FONT}\n<link rel=\"stylesheet\" href=\"css/site.css\">\n"
+            "<link rel=\"icon\" href=\"data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%E2%99%A0%3C/text%3E%3C/svg%3E\">\n"
             "<style>body{margin:0}</style>\n</head>\n<body>\n"
             f"<div class=\"top\"><div class=\"top-in\"><h1><a href=\"index.html\">DCFR poker solver</a></h1>"
             f"<span class=\"sub1\">{title}</span>{nav(current)}</div></div>\n")

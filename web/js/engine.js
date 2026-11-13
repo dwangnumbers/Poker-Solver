@@ -349,6 +349,8 @@
     const depth = 64; this.buf = [];
     for (let k = 0; k < depth; k++) this.buf.push({ val: new Float64Array(nmax), act: new Float64Array(nmax * maxA), ro: new Float64Array(nmax), rs: new Float64Array(nmax), sig: new Float64Array(nmax * maxA) });
     this.hist = [];
+    // every field is created here so that the object keeps one shape (property additions later deoptimise walk)
+    this.collect = null; this.ext = null; this.partial = false; this._tf = -1; this._dp = 0; this._dn = 0; this._sw = 0;
   }
   /* Layout: every per-node matrix is action-major, entry (hand i, action a) at a * n + i, so the inner loops run over
      contiguous memory. Locks are stored in the same layout. */
