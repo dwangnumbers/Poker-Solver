@@ -305,7 +305,7 @@ if pb:
         tc = 0.5
         t1 = (r["P1"] - tc) / Kc
         model = lambda P: tc + math.ceil(Kc / P) * t1
-        rows.append([r["spot"], f"{r['seq']:.0f}", f"{r['P1']:.0f}", f"{r['P2']:.0f}", f"{model(2):.0f}", f"{r['seq'] / r['P2']:.2f}"])
+        rows.append([r["spot"], f"{r['seq']:.0f}", f"{r['P1']:.0f}", f"{r['P2']:.0f}", f"{model(2):.0f}", f"{r['seq'] / r['P2']:.1f}"])
         if r["spot"] == "flop":
             mac("ParPredEight", f"{model(8):.0f}"); mac("ParEff", f"{100 * model(2) / r['P2']:.0f}\\%")
     table("parallel_table", ["spot", "seq.", "$P=1$", "$P=2$", "model", "speedup"], rows, "lrrrrr")
@@ -401,6 +401,38 @@ if sc and "evShow" in sc[0]:
         mac("FlopShowEval", f"{fl['evShow'] / ((fl['n'][0] + fl['n'][1]) / 2) / 2:,.0f}".replace(",", "{,}"))
     if rf:
         mac("RoofRatio", f"{1e6 * coef[0] / rf['updateNsPerEntry']:.0f}")
+# cost model on per-iteration (time, evaluated work) pairs over a solve (costpairs.js); the first two iterations of each
+# tree (compilation, first sorts) are left out; leave-one-tree-out predictions
+cp = load("costpairs")
+if cp:
+    from scipy.optimize import nnls
+    rows_ = [(t, r) for t in cp for r in t["rows"][2:]]
+    X = np.array([[t["work"], r["show"]] for t, r in rows_], float)
+    y = np.array([r["ms"] for t, r in rows_]); w = 1 / y
+    coef = nnls(X * w[:, None], y * w)[0]
+    pred = X @ coef
+    rows, loos, ins, spread = [], [], [], []
+    for t in cp:
+        m = np.array([tt is t for tt, _ in rows_])
+        cl = nnls(X[~m] * w[~m, None], y[~m] * w[~m])[0]
+        e_in = np.median(np.abs(pred[m] - y[m]) / y[m]); e_lo = np.median(np.abs(X[m] @ cl - y[m]) / y[m])
+        ins.append(e_in); loos.append((t["name"], e_lo))
+        spread.append((np.max(y[m]) - np.min(y[m])) / np.median(y[m]))
+        rows.append([t["name"], f"{t['decisions']:,}", f"{np.median(y[m]):.0f}", f"{np.median(pred[m]):.0f}", f"{100 * e_lo:.0f}\\%"])
+    table("cost_table", ["tree", "decisions", "measured", "model", "held out"], rows, "lrrrr")
+    mac("CostA", f"{1e6 * coef[0]:.0f}"); mac("CostB", f"{1e6 * coef[1]:.0f}"); mac("CostTrees", str(len(cp)))
+    mac("CostPairs", str(len(rows_)))
+    fl = [e for nm, e in loos if nm.startswith("flop")]
+    mac("CostLooFlop", f"{100 * max(fl):.0f}\\%"); mac("CostLooAll", f"{100 * max(e for _, e in loos):.0f}\\%")
+    big2 = [e for nm, e in loos if nm in ("flop, 1 size per street", "flop, standard")]
+    mac("CostLoo", f"{100 * min(big2):.0f} and {100 * max(big2):.0f}\\%")
+    mac("CostIterSpread", f"{100 * max(spread):.0f}\\%")
+    f1 = next(t for t in cp if t["name"] == "flop, 1 size per street")
+    sh = [coef[1] * r["show"] / r["ms"] for r in f1["rows"][2:]]
+    mac("FlopLeafShare", f"{100 * np.median(sh):.0f}\\%")
+    if rf:
+        mac("RoofRatio", f"{1e6 * coef[0] / rf['updateNsPerEntry']:.0f}")
+
 # memory estimate against actual
 me = load("memest")
 if me:
@@ -425,7 +457,7 @@ if pb and "iqr" in pb[0]:
     for r in pb:
         Kc = 52 - (4 if r["spot"] == "turn" else 3); tc = 0.5; t1 = (r["P1"] - tc) / Kc
         model = lambda P: tc + math.ceil(Kc / P) * t1
-        rows.append([r["spot"], f"{r['seq']:.0f}", f"{r['P1']:.0f}", f"{r['P2']:.0f}", f"{model(2):.0f}", f"{r['seq'] / r['P2']:.2f}"])
+        rows.append([r["spot"], f"{r['seq']:.0f}", f"{r['P1']:.0f}", f"{r['P2']:.0f}", f"{model(2):.0f}", f"{r['seq'] / r['P2']:.1f}"])
         if r["spot"] == "flop":
             mac("ParPredEight", f"{model(8):.0f}"); mac("ParEff", f"{100 * model(2) / r['P2']:.0f}\\%")
     table("parallel_table", ["spot", "seq.", "$P=1$", "$P=2$", "model", "speedup"], rows, "lrrrrr")
@@ -436,8 +468,8 @@ if pb:
         mac("ParOvFlop" if r["spot"] == "flop" else "ParOvTurn", "under 1\\%" if ov < 1 else f"{ov:.0f}\\%")
 # payoff sensitivity with cross-exploitability
 if ps and "crossExpl" in ps["rows"][0]:
-    rows = [[f"{r['stack']} bb", f"{r['valA']:.5f}", f"{r['valB']:.5f}", "$" + sci(r["crossExpl"], 1) + "$", f"{2 * r['stack'] * ps['maxTableDiff']:.2f}"] for r in ps["rows"]]
-    table("sens_table", ["stack", "value, table 1", "value, table 2", "cross-exploitability", "$\\delta$"], rows, "rrrrr")
+    rows = [[f"{r['stack']} bb", f"{r['valA']:.5f}", f"{abs(r['valA'] - r['valB']):.1e}", "$" + sci(r["crossExpl"], 1) + "$", f"{2 * r['stack'] * ps['maxTableDiff']:.2f}"] for r in ps["rows"]]
+    table("sens_table", ["stack", "value", "value change", "cross-exploitability", "$\\delta$"], rows, "rrrrr")
 # multiway
 if mu:
     k20 = next((v for k, v in mu.items() if "20 bb" in k), None)
@@ -484,8 +516,14 @@ if slopes:
         rows.append(row)
     table("slope_table", ["", "river", "turn", "flop"], rows, "lrrr")
 
+pT = load("perturbT")
+if pT:
+    sm = pT["small turn game"]
+    mac("CondDist", "$" + sci(np.median([r["dist"] for r in sm]), 1) + "$")
+    mac("CondExplHi", "$" + sci(sm[0]["expl"], 1) + "$"); mac("CondExplLo", "$" + sci(sm[-1]["expl"], 1) + "$")
+
 # placeholders for anything still missing, so that the deck compiles
-needed = ["ParIqr", "CostSpread", "FlopShowEval", "PertDist", "FlatClear", "FlatIndiff", "CostLoo", "MemEstErr", "PrecBase", "ParOvFlop", "ParOvTurn", "MultiTwenty", "ReportTol", "FlopLeafShare", "ParEff", "ParNodeOverhead", "FlopInfosets", "CostA", "CostB", "CostTrees", "CostResid", "FlopShowLeaves", "RoofUpdNs", "RoofCopyGBs", "RoofRatio",
+needed = ["CondDist", "CondExplHi", "CondExplLo", "CostPairs", "CostLooFlop", "CostLooAll", "CostIterSpread", "ParIqr", "CostSpread", "FlopShowEval", "PertDist", "FlatClear", "FlatIndiff", "CostLoo", "MemEstErr", "PrecBase", "ParOvFlop", "ParOvTurn", "MultiTwenty", "ReportTol", "FlopLeafShare", "ParEff", "ParNodeOverhead", "FlopInfosets", "CostA", "CostB", "CostTrees", "CostResid", "FlopShowLeaves", "RoofUpdNs", "RoofCopyGBs", "RoofRatio",
           "PrecFloor", "PrecDiff", "ParCores", "ParBytes", "ParAgree", "ParPredEight", "RiverOldNew", "RiverOldOld", "TurnLP", "TurnJS", "TurnHands",
           "FlopLP", "FlopJS", "FlopHands", "LockItBefore", "LockItAfter", "LockValAfter", "LockValBefore", "LockFoldAfter", "LockFoldBefore",
           "LockBetBefore", "SensRms", "SensMax", "LowRankErr", "DDensity", "ConvSlopes", "LeafErr"]

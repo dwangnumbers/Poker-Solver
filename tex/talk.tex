@@ -51,6 +51,7 @@
 \setbeamercolor{block body}{bg=lightblue!35,fg=ink}
 \setbeamercolor{example text}{fg=caqua!80!black}
 \metroset{titleformat frame=regular}
+\setbeamerfont{title}{size=\Large}
 \setbeamerfont{note page}{size=\scriptsize}
 
 % ---------- notation ----------
@@ -78,8 +79,8 @@
 \begin{document}
 
 % =====================================================================================
-\begin{frame}
-  \titlepage
+\begin{frame}[plain]
+  \vspace*{-14pt}\titlepage
 \note{
 \textbf{Timing for 60 minutes.} Problem and equilibria 7 $\cdot$ CFR and DCFR 7 $\cdot$ Traversal and leaves 9 $\cdot$
 Cost, memory, precision and parallelism 9 $\cdot$ Convergence and validation 6 $\cdot$ Demonstration 9 $\cdot$
@@ -212,9 +213,9 @@ The values $v_t$ are \textbf{counterfactual}: they are weighted by the probabili
 The overall regret is bounded by the sum of the counterfactual regrets, so the average strategies satisfy
 \[ \ex(\bar x_T,\bar y_T) \ \le\ \frac{\Delta\,|\mathcal I|\sqrt{|A|}}{\sqrt T}. \]
 \end{block}
-For the flop spot $|\mathcal I|\approx\FlopInfosets$, so the bound exceeds the pot by many orders of magnitude at any
-feasible $T$. It guarantees convergence, not speed.
+The bound guarantees convergence; at practical $T$ it is vacuous.
 \note{
+For the flop spot $|\mathcal I|\approx\FlopInfosets$, so the bound exceeds the pot by many orders of magnitude at any feasible $T$.\\[3pt]
 Regret matching (Hart and Mas-Colell 2000) keeps the maximal regret of order $\sqrt T$ by Blackwell approachability: the
 instantaneous regret is orthogonal to the current positive regret vector, so the squared norm of the positive regrets grows at most
 linearly.\\[3pt]
@@ -351,25 +352,25 @@ At 1081 hands the sweep is several hundred times faster than the direct sum and 
 \begin{frame}{A cost model for one iteration}
 The time of one iteration is modelled by two work counts,
 \[ T \approx a\,W_{\mathrm{dec}} + b\,W_{\mathrm{show}}, \qquad W_{\mathrm{dec}}=\sum_{\text{decisions}} n_p|A|, \]
-where $W_{\mathrm{show}}$ counts the hands at the showdown leaves actually evaluated, measured by an instrumented
-traversal. Fold and chance work are nearly proportional to these and are absorbed.
+where $W_{\mathrm{show}}$ counts the hands at the showdown leaves evaluated in that iteration; fold and chance work are
+absorbed into $a$ and $b$.
 \begin{columns}[T]
 \column{0.42\textwidth}
-\small Nonnegative least squares over \CostTrees\ trees gives $a=\CostA$ ns per regret entry and $b=\CostB$ ns per
-hand and leaf. The fit is within \CostResid\ on every tree, and within \CostLoo\ when each tree is predicted from the
-others.
+\small Times are median milliseconds per iteration on one core. A fit to \CostPairs\ timed iterations of \CostTrees\ trees gives $a=\CostA$ and $b=\CostB$ ns. Predicted from
+the other trees, the median error is \CostLoo\ on the two largest flop trees and at most \CostLooAll.
 \column{0.56\textwidth}
 \centering
-{\footnotesize\setlength\tabcolsep{2.5pt}\input{data/cost_table.tex}}\\[3pt]
-{\footnotesize Milliseconds per iteration on one core: measured, fitted, and predicted with the tree left out.}
+{\footnotesize\setlength\tabcolsep{2.5pt}\input{data/cost_table.tex}}
 \end{columns}
 \note{
-The cost of an iteration depends on the iterate: subtrees that the opponent does not reach skip their leaves, so the time per iteration
-changed by up to \CostSpread\ between the three timed blocks of the same tree. The table uses the median block. Fitting fold, chance
-and decision constants separately is ill-posed, because these counts are nearly collinear across trees.\\[3pt]
-On the flop tree the showdowns take about \FlopLeafShare\ of the time. For comparison, the same JavaScript runtime runs the bare DCFR
-update loop at \RoofUpdNs\ ns per entry and copies float32 arrays at \RoofCopyGBs\ GB/s, so $a$ is about \RoofRatio\ times the bare
-update: the gap is traversal overhead (regret matching, reach products, recursion), not memory bandwidth.\\[3pt]
+Each iteration is timed together with the work counted in the same iteration, over the first 14 to 60 iterations of a solve; the first two
+iterations of each tree (compilation, first sorts) are left out. The cost depends on the iterate, because subtrees that the opponent does
+not reach skip their leaves, and individual iterations of one tree vary by up to \CostIterSpread\ (garbage collection, compilation and the
+changing reach). The model accounts for the time; it does not predict it in advance, since $W_{\mathrm{show}}$ is measured by running.\\[3pt]
+Fitting separate fold, chance and decision constants is ill-posed because these counts are nearly collinear across trees, so $a$ includes
+the fold and chance work. On the flop tree the showdowns take about \FlopLeafShare\ of the time. The bare DCFR update loop in the same
+runtime costs \RoofUpdNs\ ns per entry; the remainder of $a$ is the rest of the traversal (regret matching, reach products, folds,
+chance nodes, recursion), not memory bandwidth, which the runtime delivers at \RoofCopyGBs\ GB/s.\\[3pt]
 Adding a bet size multiplies the tree, because it adds a branch at every node of the street and a copy of all later streets below it.
 }
 \end{frame}
@@ -407,10 +408,6 @@ number of cards is an accurate estimate.
 precision.
 
 \medskip
-Each stored update has relative rounding error $u = 2^{-24}$. The strategy sum grows like $t/3$, so a new term is
-resolved while $3/t\gg u$, that is for $t\ll10^7$.
-
-\medskip
 All four combinations of single and double precision for $R$ and $S$ reach the same exploitability, down to
 \PrecFloor\% of the pot. The strategies differ by a reach-weighted $L^1$ distance of \PrecDiff. Double precision runs whose ranges differ by
 $10^{-7}$ differ just as much (\PertDist), so this is the sensitivity of the DCFR trajectory, not storage precision.
@@ -421,13 +418,14 @@ $10^{-7}$ differ just as much (\PertDist), so this is the sensitivity of the DCF
 turn spot (dashed).}
 \end{columns}
 \note{
-The strategy sum with DCFR weights grows like $t/3$, so the new term has relative size about $3/t$. The strategy is a ratio of sums, so relative errors of the sums enter the strategy as relative errors of size $u$ per update. A term is
+Each stored update has relative rounding error $u=2^{-24}$. The strategy sum with DCFR weights grows like $t/3$, so the new term has relative
+size about $3/t$ and is resolved while $t\ll10^7$. The strategy is a ratio of sums, so relative errors of the sums enter the strategy as relative errors of size $u$ per update. A term is
 lost only when its relative size falls below $u$, which needs about $10^7$ iterations.\\[3pt]
 Any perturbation of relative size $10^{-7}$, whether rounding or a change in the inputs, leads DCFR to a different approximate
-equilibrium of the same exploitability. Two iterates of one run, at $T/1.1$ and $T$, are much closer (\PrecBase). The difference is not
-confined to nearly indifferent hands: on hands whose best action value exceeds the second by more than $10^{-3}$ of its size the distance
-is \FlatClear, against \FlatIndiff\ on the rest, so non-uniqueness of the equilibrium does not explain it. The exploitability, which is
-what a solver guarantees, does not notice. An earlier version of the
+equilibrium of the same exploitability. Two iterates of one run, at $T/1.1$ and $T$, are much closer (\PrecBase). On the small game the
+distance between the perturbed runs stays near \CondDist\ while the exploitability falls from \CondExplHi\ to \CondExplLo\% of the pot:
+the set of near-equilibria is wide, and the strategy is ill-conditioned with respect to exploitability. Trajectory sensitivity is the
+consequence. The exploitability, which is what a solver guarantees, is not affected. An earlier version of the
 solver seemed to show a single-precision floor near $10^{-3}$\% of the pot; it disappeared with the exact zero-reach handling of the DCFR
 slide, so it was an artefact of the iteration, not of rounding.\\[3pt]
 On the turn spot the curves group by the precision of the regrets: the precision of the strategy sums makes no visible difference.
@@ -446,13 +444,13 @@ workers and a coordinator keeps the tree above. One traversal is three steps:
 \item each worker returns, per chance node, the sum of its cards' child values;
 \item the coordinator divides by $K$ and finishes the traversal.
 \end{enumerate}
-The coordinator waits during step 2. With $t_c$ its time, $t_1$ the time of one card and the load per worker
-$\lceil K/P\rceil$, the model is $T(P) \approx t_c + \lceil K/P\rceil\, t_1$.
+With $t_c$ the coordinator's time and $t_1$ the time of one card, the model is
+$T(P) \approx t_c + \lceil K/P\rceil\, t_1$.
 \column{0.45\textwidth}
 \centering
 {\footnotesize\setlength\tabcolsep{3pt}\input{data/parallel_table.tex}}\\[4pt]
-{\footnotesize Medians of seven interleaved runs, in milliseconds per iteration, in Chrome with Web Workers on the
-\ParCores-core test machine; interquartile ranges are within \ParIqr\ of the medians. The model is calibrated on $P=1$.}
+{\footnotesize Medians of seven interleaved runs in Chrome, ms per iteration; interquartile ranges within \ParIqr.
+The model is calibrated on $P=1$.}
 \end{columns}
 \note{
 This is a domain decomposition of the tree with the first-level chance nodes as interface. The messages are two vectors of length $n$
@@ -625,8 +623,7 @@ model is exact.
 \begin{center}
 {\footnotesize\setlength\tabcolsep{5pt}\input{data/pf_table.tex}}
 \end{center}
-{\small Heads-up push or fold. DCFR agrees with a linear program on the same tables, and the frequencies match published
-equilibrium charts.}
+{\small Heads-up push or fold: DCFR against a linear program on the same tables.}
 \note{
 The equity tables are computed once offline: 169 by 169 class equities by Monte Carlo with 50{,}000 deals per pair, and exact pair
 counts.\\[3pt]
@@ -643,12 +640,8 @@ If the payoffs of a game are perturbed by at most $\delta$ at every terminal nod
 at most $\delta$, and an $\varepsilon$-equilibrium of the perturbed game is an $(\varepsilon+\delta)$-equilibrium of the
 original game.
 \end{block}
-The equity tables are Monte Carlo estimates, so the preflop solver solves a perturbed game. A showdown with pot $\Pi$
-has payoff error $\Pi\,|\hat e - e|$.
-
-\medskip
-Two independent tables differ by \SensRms\ in root mean square and \SensMax\ at most. With $\delta$ the pot times that
-maximum, the lemma makes each solution an $(\varepsilon+\delta)$-equilibrium of the other game. The measured
+The equity tables are Monte Carlo estimates. Two independent tables differ by at most \SensMax, so with $\delta$ the pot
+times that difference each solution is an $(\varepsilon+\delta)$-equilibrium of the other game. The measured
 cross-exploitability is four to five orders of magnitude smaller:
 \begin{center}
 {\footnotesize\setlength\tabcolsep{5pt}\input{data/sens_table.tex}}
@@ -748,7 +741,7 @@ iterates exact.
 \item A theory of the observed DCFR rates on poker trees is open.
 \end{itemize}
 \note{
-The first item is the research continuation (\texttt{talk-newton.pdf}): from a DCFR start, a proximal Newton method with interior-point
+The second item is the research continuation (\texttt{talk-newton.pdf}): from a DCFR start, a proximal Newton method with interior-point
 crossover finished small and medium river games to machine precision. Extending it to turn and flop trees needs the structured linear
 algebra of the leaves inside the Newton systems.\\[3pt]
 The pruning item connects to the exactness slide: naive pruning changed the iterates and slowed convergence by a large factor, so a
@@ -762,8 +755,8 @@ correct version must apply the skipped discounts lazily.
 \item One method, discounted CFR, solves flop, turn and river subgames, locked games and preflop games.
 \item Range vectorization makes each iteration a sequence of vector operations, and inclusion--exclusion with sorted
 sweeps makes every leaf linear in the number of hands.
-\item A two-term cost model predicts the time per iteration to within \CostLoo\ on held-out trees, single precision
-storage reaches the same exploitability, and the partition by chance card reproduces the sequential results.
+\item A two-term cost model accounts for the time per iteration, single precision storage reaches the same
+exploitability, and the partition by chance card reproduces the sequential results.
 \item DCFR reaches practical accuracy in a few hundred iterations on every street we measured, so the cost per
 iteration decides the running time.
 \end{itemize}
