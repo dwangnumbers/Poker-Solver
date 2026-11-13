@@ -432,8 +432,10 @@
       for (let a = 1, o = np; a < na; a++, o += np) for (let i = 0; i < np; i++) out[i] += sig[o + i] * act[o + i];
       if (mode === 0 && !node.lock) {
         if (this._tf !== this.t) {
-          const t = this.t, ta = Math.pow(t, this.alpha), tb = Math.pow(t, this.beta);
-          this._dp = ta / (ta + 1); this._dn = this.beta < -1e6 ? 0 : tb / (tb + 1); this._sw = Math.pow(t / (t + 1), this.gamma); this._tf = t;
+          // DCFR: positive regrets times t^a/(t^a+1), negative times t^b/(t^b+1), strategy sums times (t/(t+1))^g.
+          // CFR is a = b = infinity, g = 0; CFR+ is a = infinity, b = -infinity (negative regrets reset), g = 1.
+          const t = this.t, disc = e => e === Infinity ? 1 : e === -Infinity ? 0 : Math.pow(t, e) / (Math.pow(t, e) + 1);
+          this._dp = disc(this.alpha); this._dn = this.beta < -1e6 ? 0 : disc(this.beta); this._sw = Math.pow(t / (t + 1), this.gamma); this._tf = t;
         }
         const R = node.R, S = node.S, dpf = this._dp, dnf = this._dn, sw = this._sw;
         for (let a = 0, o = 0; a < na; a++, o += np) {

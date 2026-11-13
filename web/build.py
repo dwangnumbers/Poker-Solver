@@ -41,9 +41,9 @@ def main():
     for f in (web / "js").glob("*.js"):
         shutil.copy(f, docs / "js" / f.name)
     shutil.copy(web / "css" / "site.css", docs / "css" / "site.css")
-    for f in (web / "data").glob("*") if (web / "data").exists() else []:
-        (docs / "data").mkdir(exist_ok=True)
-        shutil.copy(f, docs / "data" / f.name)
+    (docs / "data").mkdir(exist_ok=True)
+    for name in ("c2.u16", "eq2.f32", "eq3r.f32"):          # eq3.u16 (the full three-way table) stays in the repository
+        shutil.copy(web / "data" / name, docs / "data" / name)
     for name, title in PAGES:
         src = web / "pages" / name
         if name == "demo.html" or not src.exists():

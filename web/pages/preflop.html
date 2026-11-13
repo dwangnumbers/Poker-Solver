@@ -1,0 +1,61 @@
+<!--HEAD Preflop and multiway solver-->
+<div class="wrap">
+  <div class="cols2">
+    <div class="col">
+      <section class="panel">
+        <h2>Game <span class="h2r"><select class="inp" id="preset" aria-label="Presets"></select></span></h2>
+        <div class="form3">
+          <label class="f">Players<select id="players"><option>2</option><option>3</option><option>4</option><option>5</option><option selected>6</option></select></label>
+          <label class="f">Stack, bb<input id="stack" type="number" min="1" step="1"></label>
+          <label class="f">Ante per player, bb<input id="ante" type="number" min="0" step="0.05"></label>
+          <label class="f">Open to, bb<input id="open" type="number" min="1.5" step="0.1"></label>
+          <label class="f">Blinds open to, bb<input id="sbOpen" type="number" min="1.5" step="0.1"></label>
+          <label class="f">3-bet in position, ×<input id="tbIP" type="number" min="1.5" step="0.1"></label>
+          <label class="f">3-bet out of position, ×<input id="tbOOP" type="number" min="1.5" step="0.1"></label>
+          <label class="f">4-bet and later, ×<input id="fb" type="number" min="1.5" step="0.1"></label>
+          <label class="f">Raises per hand<select id="maxRaises"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option></select></label>
+          <label class="f">All-in above, × stack<input id="thr" type="number" min="0" max="1" step="0.05"></label>
+          <label class="f">Players to the flop<select id="maxToFlop"><option>2</option><option>3</option></select></label>
+          <label class="f">Options<span style="display:flex;flex-direction:column;gap:2px;color:var(--ink)"><label><input type="checkbox" id="allin"> all-in at every raise</label><label><input type="checkbox" id="sbLimp"> small blind may limp</label></span></label>
+        </div>
+        <p class="hint">Raises are multiples of the previous bet. A raise above the all-in threshold becomes all-in. A hand that reaches the flop is settled by all-in equity among the players left, so postflop play is not modelled; with three players in, the opponents' cards are treated as independent given the hero's hand. With two players the solution is an equilibrium of this game; with more players DCFR has no convergence guarantee and the page reports the measured NashConv.</p>
+        <div class="est" id="est"></div>
+      </section>
+      <section class="panel">
+        <h2>Solver <span class="h2r muted" id="info"></span></h2>
+        <div class="solvebar">
+          <label class="f">Target, mbb per hand<input id="target" type="number" min="0.01" step="0.1" value="0.2" style="width:90px"></label>
+          <label class="f">Iterations per run<input id="maxIt" type="number" min="10" step="50" value="2000" style="width:90px"></label>
+          <button class="btn primary" id="btnSolve" type="button">Build and solve</button>
+          <button class="btn" id="btnResume" type="button" disabled>Continue</button>
+          <button class="btn" id="btnStop" type="button" disabled>Stop</button>
+        </div>
+        <div class="progress"><i id="prog"></i></div>
+        <p class="status" id="status">Choose a game, then build and solve it.</p>
+        <div class="chartbox" id="chart"></div>
+      </section>
+      <section class="panel" id="rfiBox" hidden>
+        <h2>First-in ranges</h2>
+        <div id="rfi"></div>
+      </section>
+    </div>
+    <div class="col">
+      <section class="panel" id="browser" hidden>
+        <h2>Strategy browser <span class="h2r"><span class="modes" id="viewModes"><button type="button" data-m="strategy" aria-pressed="true">Strategy</button><button type="button" data-m="ev">EV</button><button type="button" data-m="range">Range</button></span>
+          <button class="btn small" id="btnCsv" type="button">Export CSV</button></span></h2>
+        <div class="navline" id="navline"></div>
+        <div class="nodehead" id="nodehead"></div>
+        <div class="actions" id="actions"></div>
+        <div class="tabs" id="pTabs" style="margin-top:12px"></div>
+        <div class="gridbox">
+          <div><div class="grid" id="grid"></div><div class="legend" id="legend"></div><div class="rangebar" id="rangebar"></div></div>
+          <div class="detail" id="detail"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+<script src="js/engine.js"></script>
+<script src="js/preflop.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/preflop-ui.js"></script>
