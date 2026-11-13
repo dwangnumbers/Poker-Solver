@@ -16,8 +16,10 @@ node lock.js > out/lock.log 2>&1
 node conv.js river 2000 1 > out/conv_river.log 2>&1
 node conv.js turn 600 1 > out/conv_turn.log 2>&1
 node conv.js flop 150 1 > out/conv_flop.log 2>&1
-for s in river turn flop; do node convspots.js $s > out/convspots_$s.log 2>&1; done
-node reportsub.js 25,49,95 > out/reportsub.log 2>&1
+for s in river turn flop flopsize; do node convspots.js $s > out/convspots_$s.log 2>&1; done
+node precbase.js > out/precbase.log 2>&1
+node reportsub.js 25,49 0.05 reportsub_tight > out/reportsub_tight.log 2>&1
+node reportsub.js 95 0.05 reportsub_tight95 > out/reportsub_tight95.log 2>&1
 node pf_hu.js > out/pf_hu.log 2>&1; python3 pf_lp.py > out/pf_lp.log 2>&1
 node pf_sens.js > out/pf_sens.log 2>&1
 node pf_multi.js 1000 > out/pf_multi.log 2>&1
