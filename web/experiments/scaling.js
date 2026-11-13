@@ -26,8 +26,12 @@ for (const [name, b, pot, stack, tree] of cfgs) {
   const nn = (g.n[0] + g.n[1]) / 2; let wf = 0, ws = 0, wc = 0;
   (function walk(n) { if (!n) return; if (n.t === 'f') { wf += nn; return; } if (n.t === 's') { ws += nn; return; } if (n.t === 'c') { wc += nn * n.cards.length; n.cards.forEach(c => walk(n.ch[c])); return; } n.ch.forEach(walk); })(g.root);
   s.iterate(1); const reps = work > 3e7 ? 4 : work > 3e6 ? 10 : 40;
-  const t1 = Date.now(); s.iterate(reps); const per = (Date.now() - t1) / reps;
-  const r = { name, decisions: g.decisions.length, work, foldWork: wf, showWork: ws, chanceWork: wc, foldLeaves: nf, showLeaves: ns, chance: nc, n: g.n, memMB: g.memBytes / 1e6, buildMs: tb, msPerIter: per };
+  // three timed blocks of reps iterations; the median block is reported and the spread is kept
+  const blocks = []; for (let k = 0; k < 3; k++) { const t1 = Date.now(); s.iterate(reps); blocks.push((Date.now() - t1) / reps); }
+  const per = blocks.slice().sort((x, y) => x - y)[1];
+  // leaves and chance children actually evaluated (subtrees with zero opponent reach skip their leaves), per iteration
+  s.count = { fold: 0, show: 0, chance: 0, own: 0, opp: 0 }; s.iterate(2); const ev = { fold: s.count.fold / 2, show: s.count.show / 2, chance: s.count.chance / 2, own: s.count.own / 2, opp: s.count.opp / 2 }; s.count = null;
+  const r = { name, decisions: g.decisions.length, work, foldWork: wf, showWork: ws, chanceWork: wc, evFold: ev.fold, evShow: ev.show, evChance: ev.chance, evOwn: ev.own, evOpp: ev.opp, foldLeaves: nf, showLeaves: ns, chance: nc, n: g.n, memMB: g.memBytes / 1e6, buildMs: tb, msPerIter: per, blocks };
   res.push(r); console.log(JSON.stringify(r));
 }
 fs.writeFileSync(__dirname + '/out/scaling.json', JSON.stringify(res));

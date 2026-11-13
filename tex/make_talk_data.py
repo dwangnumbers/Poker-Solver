@@ -256,7 +256,10 @@ if sc and "foldWork" in sc[0] and lcb:
         return coef[0] * r["work"] + coef[1] * r["chanceWork"] + b_ * r["showWork"] + c_ * r["foldWork"]
     rel = np.array([abs(model(r) - r["msPerIter"]) / r["msPerIter"] for r in fit])
     mac("CostA", f"{1e6 * coef[0]:.1f}"); mac("CostB", f"{1e6 * b_:.0f}"); mac("CostC", f"{1e6 * c_:.0f}"); mac("CostD", f"{1e6 * coef[1]:.1f}")
-    mac("CostTrees", str(len(fit))); mac("CostResid", f"{100 * rel.max():.0f}\\%")
+    mac("CostTrees", str(len(fit)))
+    spreads = [(max(r["blocks"]) - min(r["blocks"])) / r["msPerIter"] for r in fit if "blocks" in r]
+    if spreads:
+        mac("CostSpread", f"{100 * max(spreads):.0f}\\%"); mac("CostResid", f"{100 * rel.max():.0f}\\%")
     rows = [[r["name"], f"{r['decisions']:,}", f"{r['msPerIter']:.0f}", f"{model(r):.0f}"] for r in fit]
     table("cost_table", ["tree", "decisions", "measured", "model"], rows, "lrrr")
     fl = next((r for r in sc if r["name"] == "flop, 1 size per street"), None)
@@ -369,38 +372,33 @@ if lr:
     mac("LowRankErr", "$" + sci(next(r for r in lr["rows"] if r["rank"] == 16)["contractionError"], 1) + "$")
 
 # =====================================================================================  third round
-# cost model with leaf cost per hand interpolated at the tree's n, and leave-one-out validation
-if sc and "foldWork" in sc[0] and lcb:
+# cost model: T = a W_dec + b W_show, with W_show the showdown work actually evaluated per iteration (instrumented
+# engine); fold and chance work are nearly collinear with these and are absorbed. NNLS on relative residuals, with
+# leave-one-out predictions.
+if sc and "evShow" in sc[0]:
     from scipy.optimize import nnls
-    ns = np.array([r["n"] for r in lcb], float)
-    def per_hand(key, n):
-        return np.interp(n, ns, [r[key] / r["n"] for r in lcb])
     fit = [r for r in sc if r["msPerIter"] >= 5]
-    def leaf_ms(r):
-        n = (r["n"][0] + r["n"][1]) / 2
-        return 2e-3 * (per_hand("sweep_us", n) * r["showWork"] + per_hand("fold_us", n) * r["foldWork"])
-    def fitab(rows):
-        X = np.array([[r["work"], r["chanceWork"]] for r in rows], float)
-        y = np.array([r["msPerIter"] - leaf_ms(r) for r in rows], float)
-        w = 1 / np.array([r["msPerIter"] for r in rows])
-        return nnls(X * w[:, None], y * w)[0]
-    coef = fitab(fit)
-    model = lambda r, c: c[0] * r["work"] + c[1] * r["chanceWork"] + leaf_ms(r)
+    X = np.array([[r["work"], r["evShow"]] for r in fit], float)
+    y = np.array([r["msPerIter"] for r in fit]); w = 1 / y
+    coef = nnls(X * w[:, None], y * w)[0]
+    pred = X @ coef
     loo = []
-    for k, r in enumerate(fit):
-        c = fitab(fit[:k] + fit[k + 1:])
-        loo.append(model(r, c))
-    rel_in = max(abs(model(r, coef) - r["msPerIter"]) / r["msPerIter"] for r in fit)
-    rel_loo = max(abs(m - r["msPerIter"]) / r["msPerIter"] for m, r in zip(loo, fit))
-    mac("CostA", f"{1e6 * coef[0]:.1f}"); mac("CostD", f"{1e6 * coef[1]:.1f}")
-    n0 = np.mean([(r["n"][0] + r["n"][1]) / 2 for r in fit])
-    mac("CostB", f"{2e3 * per_hand('sweep_us', n0):.0f}"); mac("CostC", f"{2e3 * per_hand('fold_us', n0):.0f}")
-    mac("CostResid", f"{100 * rel_in:.0f}\\%"); mac("CostLoo", f"{100 * rel_loo:.0f}\\%")
-    rows = [[r["name"], f"{r['decisions']:,}", f"{r['msPerIter']:.0f}", f"{model(r, coef):.0f}", f"{m:.0f}"] for r, m in zip(fit, loo)]
+    for k in range(len(fit)):
+        m = np.ones(len(fit), bool); m[k] = False
+        loo.append(X[k] @ nnls(X[m] * w[m, None], y[m] * w[m])[0])
+    mac("CostA", f"{1e6 * coef[0]:.0f}"); mac("CostB", f"{1e6 * coef[1]:.0f}")
+    mac("CostTrees", str(len(fit)))
+    spreads = [(max(r["blocks"]) - min(r["blocks"])) / r["msPerIter"] for r in fit if "blocks" in r]
+    if spreads:
+        mac("CostSpread", f"{100 * max(spreads):.0f}\\%")
+    mac("CostResid", f"{100 * np.max(np.abs(pred - y) / y):.0f}\\%")
+    mac("CostLoo", f"{100 * np.max(np.abs(np.array(loo) - y) / y):.0f}\\%")
+    rows = [[r["name"], f"{r['decisions']:,}", f"{r['msPerIter']:.0f}", f"{pp:.0f}", f"{l:.0f}"] for r, pp, l in zip(fit, pred, loo)]
     table("cost_table", ["tree", "decisions", "measured", "model", "held out"], rows, "lrrrr")
     fl = next((r for r in sc if r["name"] == "flop, 1 size per street"), None)
     if fl:
-        mac("FlopLeafShare", f"{100 * leaf_ms(fl) / fl['msPerIter']:.0f}\\%")
+        mac("FlopLeafShare", f"{100 * coef[1] * fl['evShow'] / fl['msPerIter']:.0f}\\%")
+        mac("FlopShowEval", f"{fl['evShow'] / ((fl['n'][0] + fl['n'][1]) / 2) / 2:,.0f}".replace(",", "{,}"))
     if rf:
         mac("RoofRatio", f"{1e6 * coef[0] / rf['updateNsPerEntry']:.0f}")
 # memory estimate against actual
@@ -422,14 +420,24 @@ pbs = load("precbase")
 if pbs:
     mac("PrecBase", "$" + sci(pbs["small turn game"], 1) + "$" + (" and $" + sci(pbs["turn spot"], 1) + "$" if "turn spot" in pbs else ""))
 # parallel: medians of repeated browser runs, overheads
+if pb and "iqr" in pb[0]:
+    rows = []
+    for r in pb:
+        Kc = 52 - (4 if r["spot"] == "turn" else 3); tc = 0.5; t1 = (r["P1"] - tc) / Kc
+        model = lambda P: tc + math.ceil(Kc / P) * t1
+        rows.append([r["spot"], f"{r['seq']:.0f}", f"{r['P1']:.0f}", f"{r['P2']:.0f}", f"{model(2):.0f}", f"{r['seq'] / r['P2']:.2f}"])
+        if r["spot"] == "flop":
+            mac("ParPredEight", f"{model(8):.0f}"); mac("ParEff", f"{100 * model(2) / r['P2']:.0f}\\%")
+    table("parallel_table", ["spot", "seq.", "$P=1$", "$P=2$", "model", "speedup"], rows, "lrrrrr")
+    mac("ParIqr", f"{100 * max((r['iqr'][k][1] - r['iqr'][k][0]) / r[k] for r in pb for k in ('seq', 'P1', 'P2')):.0f}\\%")
 if pb:
     for r in pb:
         ov = 100 * (r['P1'] / r['seq'] - 1)
         mac("ParOvFlop" if r["spot"] == "flop" else "ParOvTurn", "under 1\\%" if ov < 1 else f"{ov:.0f}\\%")
 # payoff sensitivity with cross-exploitability
 if ps and "crossExpl" in ps["rows"][0]:
-    rows = [[f"{r['stack']} bb", f"{r['valA']:.5f}", f"{r['valB']:.5f}", "$" + sci(r["crossExpl"], 1) + "$", f"{2 * 2 * r['stack'] * ps['maxTableDiff']:.2f}"] for r in ps["rows"]]
-    table("sens_table", ["stack", "value, table 1", "value, table 2", "cross-exploitability", "$2\\delta$"], rows, "rrrrr")
+    rows = [[f"{r['stack']} bb", f"{r['valA']:.5f}", f"{r['valB']:.5f}", "$" + sci(r["crossExpl"], 1) + "$", f"{2 * r['stack'] * ps['maxTableDiff']:.2f}"] for r in ps["rows"]]
+    table("sens_table", ["stack", "value, table 1", "value, table 2", "cross-exploitability", "$\\delta$"], rows, "rrrrr")
 # multiway
 if mu:
     k20 = next((v for k, v in mu.items() if "20 bb" in k), None)
@@ -458,8 +466,26 @@ if rt or rt95:
     table("report_table", ["flops", "big blind value", "solver bound", "big blind bets"], rows, "rrrr")
     mac("ReportTol", f"{(rt or rt95)['tol']}")
 
+pt, fd = load("perturb"), load("flatdir")
+if pt:
+    mac("PertDist", "$" + sci(pt["small turn game"]["distance"], 1) + "$ and $" + sci(pt["turn spot"]["distance"], 1) + "$")
+if fd:
+    x = fd["small turn game"]["0.001"]
+    mac("FlatClear", "$" + sci(x["clear"], 1) + "$"); mac("FlatIndiff", "$" + sci(x["indifferent"], 1) + "$")
+# slopes as a small table for the notes
+if slopes:
+    names = {"CFR": "CFR", "CFR+": "CFR$^+$", "DCFR": "DCFR"}
+    rows = []
+    for nm in ("CFR", "CFR+", "DCFR"):
+        row = [names[nm]]
+        for st in ("river", "turn", "flop"):
+            q = [sl for sl in slopes if sl[0] == st and sl[1] == nm]
+            row.append(f"${q[0][2]:.1f}$ to ${q[0][3]:.1f}$" if q else "--")
+        rows.append(row)
+    table("slope_table", ["", "river", "turn", "flop"], rows, "lrrr")
+
 # placeholders for anything still missing, so that the deck compiles
-needed = ["CostLoo", "MemEstErr", "PrecBase", "ParOvFlop", "ParOvTurn", "MultiTwenty", "ReportTol", "FlopLeafShare", "ParEff", "ParNodeOverhead", "FlopInfosets", "CostA", "CostB", "CostC", "CostD", "CostTrees", "CostResid", "FlopShowLeaves", "RoofUpdNs", "RoofCopyGBs", "RoofRatio",
+needed = ["ParIqr", "CostSpread", "FlopShowEval", "PertDist", "FlatClear", "FlatIndiff", "CostLoo", "MemEstErr", "PrecBase", "ParOvFlop", "ParOvTurn", "MultiTwenty", "ReportTol", "FlopLeafShare", "ParEff", "ParNodeOverhead", "FlopInfosets", "CostA", "CostB", "CostTrees", "CostResid", "FlopShowLeaves", "RoofUpdNs", "RoofCopyGBs", "RoofRatio",
           "PrecFloor", "PrecDiff", "ParCores", "ParBytes", "ParAgree", "ParPredEight", "RiverOldNew", "RiverOldOld", "TurnLP", "TurnJS", "TurnHands",
           "FlopLP", "FlopJS", "FlopHands", "LockItBefore", "LockItAfter", "LockValAfter", "LockValBefore", "LockFoldAfter", "LockFoldBefore",
           "LockBetBefore", "SensRms", "SensMax", "LowRankErr", "DDensity", "ConvSlopes", "LeafErr"]

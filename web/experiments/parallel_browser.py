@@ -13,13 +13,19 @@ async () => {
   const out = [];
   for (const [k, sp] of Object.entries(spots)) {
     const cfg = { board: sp.board.match(/../g).map(E.cardOf), pot: sp.pot, stack: sp.stack, ranges, tree: sp.tree };
-    const REP = 5, reps = { seq: [], P1: [], P2: [] };
+    // interleaved: each round times the sequential solver, one worker and two workers in turn
+    const REP = 7, reps = { seq: [], P1: [], P2: [] };
     const s = new E.Solver(E.buildGame(cfg)); s.iterate(2);
-    for (let r = 0; r < REP; r++) { const t0 = performance.now(); s.iterate(4); reps.seq.push((performance.now() - t0) / 4); }
-    for (const K of [1, 2]) { const pool = await P.create(cfg, { workers: K, url: 'js/worker.js' }); await pool.iterate(2);
-      for (let r = 0; r < REP; r++) { const t0 = performance.now(); await pool.iterate(4); reps['P' + K].push((performance.now() - t0) / 4); } pool.terminate(); }
-    const med = a => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
-    const row = { spot: k, reps, seq: med(reps.seq), P1: med(reps.P1), P2: med(reps.P2) };
+    const pools = { P1: await P.create(cfg, { workers: 1, url: 'js/worker.js' }), P2: await P.create(cfg, { workers: 2, url: 'js/worker.js' }) };
+    await pools.P1.iterate(2); await pools.P2.iterate(2);
+    for (let r = 0; r < REP; r++) {
+      let t0 = performance.now(); s.iterate(4); reps.seq.push((performance.now() - t0) / 4);
+      for (const k of ['P1', 'P2']) { t0 = performance.now(); await pools[k].iterate(4); reps[k].push((performance.now() - t0) / 4); }
+    }
+    pools.P1.terminate(); pools.P2.terminate();
+    const q = (a, f) => { const b = a.slice().sort((x, y) => x - y); const i = f * (b.length - 1), lo = Math.floor(i); return b[lo] + (b[Math.ceil(i)] - b[lo]) * (i - lo); };
+    const row = { spot: k, reps, seq: q(reps.seq, 0.5), P1: q(reps.P1, 0.5), P2: q(reps.P2, 0.5),
+      iqr: { seq: [q(reps.seq, 0.25), q(reps.seq, 0.75)], P1: [q(reps.P1, 0.25), q(reps.P1, 0.75)], P2: [q(reps.P2, 0.25), q(reps.P2, 0.75)] } };
     out.push(row);
   }
   return out;

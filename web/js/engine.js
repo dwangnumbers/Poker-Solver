@@ -352,7 +352,9 @@
     for (let k = 0; k < depth; k++) this.buf.push({ val: new Float64Array(nmax), act: new Float64Array(nmax * maxA), ro: new Float64Array(nmax), rs: new Float64Array(nmax), sig: new Float64Array(nmax * maxA) });
     this.hist = [];
     // every field is created here so that the object keeps one shape (property additions later deoptimise walk)
-    this.collect = null; this.ext = null; this.partial = false; this.zr = false; this.noSkip = false; this._tf = -1; this._dp = 0; this._dn = 0; this._sw = 0;
+    this.collect = null; this.ext = null; this.partial = false; this.zr = false; this.noSkip = false; this._tf = -1;
+    // instrumentation for the experiments: counts of evaluated leaves and chance children (in hands), and recorded action values
+    this.count = null; this.rec = null; this._dp = 0; this._dn = 0; this._sw = 0;
   }
   /* Layout: every per-node matrix is action-major, entry (hand i, action a) at a * n + i, so the inner loops run over
      contiguous memory. Locks are stored in the same layout. */
@@ -385,6 +387,7 @@
     // zr: the opponent's reach is zero in this whole subtree, so every value is zero; the subtree is still walked in
     // update modes so that the DCFR discounts and the strategy sums of player p are applied exactly as in plain DCFR
     if (this.zr && node.t !== 'd' && node.t !== 'c') { out.fill(0, 0, np); return out; }
+    if (this.count) { if (node.t === 'f') this.count.fold += np; else if (node.t === 's') this.count.show += np; }
     if (node.t === 'f') {
       foldMass(g, p, ro, out, null); const pay = node.pay[p];
       for (let i = 0; i < np; i++) out[i] *= pay;
@@ -410,6 +413,7 @@
           if (mode === 0 || mode === 3) { const z = this.zr; this.zr = true; this.walk(node.ch[c], p, ro2, rs2, depth + 1, mode); this.zr = z; }
           continue;
         }
+        if (this.count) this.count.chance += np;
         const v = this.walk(node.ch[c], p, ro2, rs2, depth + 1, mode);
         for (let k = 0; k < dp.length; k++) v[dp[k]] = 0;
         for (let i = 0; i < np; i++) out[i] += v[i];
@@ -420,6 +424,7 @@
     }
     // decision node
     const na = node.na, sig = B.sig, tmp = B.rs;
+    if (this.count) { if (node.p === p) this.count.own += np * na; else if (!this.zr) this.count.opp += nq * na; }
     if (node.p === p) {
       if (mode === 0 || mode === 3) regretMatch(node, np, sig, B.ro); else averageStrategy(node, np, sig, B.ro);
       const rs2 = B.rs;
@@ -433,6 +438,7 @@
         const v = this.walk(node.ch[a], p, ro, rs2, depth + 1, mode);
         for (let i = 0; i < np; i++) act[o + i] = v[i];
       }
+      if (this.rec && mode === 2) this.rec.set(node, Float64Array.from(act.subarray(0, na * np)));
       if (mode === 1 && !node.lock) {          // best response: max over actions
         for (let i = 0; i < np; i++) out[i] = act[i];
         for (let a = 1, o = np; a < na; a++, o += np) for (let i = 0; i < np; i++) { const x = act[o + i]; if (x > out[i]) out[i] = x; }
