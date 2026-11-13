@@ -1,0 +1,56 @@
+<!--HEAD Methods and guide-->
+<div class="wrap">
+<section class="panel prose">
+<h2 style="margin-top:4px">What the solver computes</h2>
+<p>A spot is a two-player zero-sum game: a board, a pot, an effective stack, a range for each player and a tree of allowed bet sizes. The solver returns an average strategy profile whose exploitability, the mean gain of the two best responses, is reported as a percentage of the pot.</p>
+<div class="eq">expl(σ) = ½ [ max_σ0' u0(σ0', σ1) + max_σ1' u1(σ0, σ1') ]  ( = ½ Σ_p (BR_p − v_p) with rake )</div>
+<p>All pages run in your browser. Nothing is sent to a server.</p>
+
+<h2>Discounted CFR</h2>
+<p>Every decision node stores, for each hand and action, a cumulative regret and a cumulative strategy weight. One iteration traverses the tree once for each player (alternating updates). The current strategy is regret matching on the positive regrets, and DCFR discounts the sums at iteration t:</p>
+<div class="eq">σ_t(a) = R⁺(a) / Σ_b R⁺(b)       (uniform when all regrets are ≤ 0)
+R ← R · t^α/(t^α+1) if R > 0,  R · t^β/(t^β+1) if R ≤ 0,  then R ← R + (v(a) − v)
+S ← S · (t/(t+1))^γ + π_own · σ_t                α = 1.5, β = 0, γ = 2</div>
+<p>CFR is the limit α = β = ∞, γ = 0, and CFR+ is α = ∞, β = −∞, γ = 1; both are available to the experiments in the repository.</p>
+
+<h2>Range-vectorized traversal of the public tree</h2>
+<p>The tree is the public tree: its nodes are betting sequences and dealt cards, not private hands. Each player's private state is a vector over the hands of their range, so a traversal costs one vector operation per edge. At a decision node with |A| actions and n hands the update is O(n|A|); one iteration costs</p>
+<div class="eq">W = Σ_decisions n_p |A| + Σ_fold leaves O(n) + Σ_showdown leaves O(n)</div>
+<p>A chance node deals each remaining card with weight 1/K, where K = 48 − |board| is the number of cards left once both hands are known; hands that contain the dealt card get reach zero.</p>
+
+<h2>Terminal values in linear time</h2>
+<p>A fold leaf needs, for each own hand, the total opponent weight that shares no card with it. With per-card sums C(c) this is an inclusion–exclusion:</p>
+<div class="eq">m(h) = T − C(h₁) − C(h₂) + w(h)        T = Σ_j w_j,  C(c) = Σ_{j ∋ c} w_j</div>
+<p>A showdown leaf sorts both lists by hand strength once per runout. One ascending sweep gives, for each own hand, the compatible opponent weight that is strictly weaker (L) and weaker or equal (L⁼), with the same inclusion–exclusion inside the sweep:</p>
+<div class="eq">v(h) = Lo · m(h) + (W − Lo) · L(h) + (T − Lo) · (L⁼(h) − L(h))</div>
+<p>W, Lo and T are the payoffs for a win, a loss and a tie. Both leaves cost O(n) instead of O(n²).</p>
+
+<h2>Memory and precision</h2>
+<p>Regrets and strategy sums are stored in single precision in large flat blocks, 8 bytes per hand and action. The solver page estimates the total before building the tree. Discounting keeps the stored magnitudes bounded, and the experiments in the talk show that single precision reaches the same exploitability as double precision down to the levels a solver is run to.</p>
+
+<h2>Parallel solving</h2>
+<p>On flop and turn spots the work below the first chance node is split by the dealt card among Web Workers. A traversal is three steps: the coordinator records both reach vectors at each first-level chance node, every worker returns the sum of its cards' values, and the coordinator divides by K and finishes the traversal. The arithmetic is the same as the sequential traversal, so the iterates agree to the last bit up to the order of summation.</p>
+
+<h2>Node locking</h2>
+<p>A locked node keeps a fixed strategy: its regrets are not updated and best responses do not optimise over it. The rest of the tree is re-solved against it, which answers questions such as how the other player should adjust to an opponent who bets too often.</p>
+
+<h2>Aggregate reports</h2>
+<p>Up to a permutation of suits there are 1,755 different flops among the 22,100 deals of three cards. A report solves one spot on a subset and averages with weights equal to the number of deals each flop stands for. Subsets are stratified by texture (rainbow, two-tone, monotone, paired, trips) and by rank.</p>
+
+<h2>Preflop and multiway</h2>
+<p>Preflop strategies are per starting-hand class (169 classes). A hand that sees a flop is settled by all-in equity, so postflop play is not modelled. Card removal between classes i and j uses the exact fraction of compatible combination pairs</p>
+<div class="eq">M_ij = (compatible pairs of combos of i and j) / (|i| |j|),     M = 1 − D,  D nonzero only for classes sharing a rank</div>
+<p>which makes the heads-up game exact at the class level: heads-up push or fold agrees with a linear program to five digits. Three-way showdowns use the tensor F_i(j,k), the equity of i against j and k, through a symmetric low-rank factorisation F_i ≈ Σ_r λ_ir u_ir u_irᵀ of rank 16. With three or more players DCFR has no convergence guarantee; the page reports the measured NashConv, the sum of the players' best-response gains.</p>
+
+<h2>Quick guide</h2>
+<h3>Postflop</h3>
+<p>Pick an example spot or enter a board of three to five cards, a pot, a stack, the two ranges and the bet sizes. The estimate under the tree shows the memory needed. Build and solve runs until the exploitability target or the iteration count. Click actions and cards to walk the tree; the grid shows the strategy, EV or equity per hand class, and pointing at a square lists its combinations. Node locking is under the grid.</p>
+<h3>Preflop and multiway</h3>
+<p>Choose a preset or set the number of players, the stack and the raise sizes. The first-in table lists how often each seat plays when folded to.</p>
+<h3>Flop reports</h3>
+<p>Choose ranges, a flop tree and a flop set, and run. The table can be sorted and exported.</p>
+<h3>Talk demo</h3>
+<p>The single-street river table used in the talk, with a step-by-step demo guide.</p>
+<p class="muted">Source code: <a href="https://github.com/dwangnumbers/Poker-Solver">github.com/dwangnumbers/Poker-Solver</a>.</p>
+</section>
+</div>

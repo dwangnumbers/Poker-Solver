@@ -18,7 +18,7 @@ for (const [name, b, pot, stack, tree] of cfgs) {
   let nf = 0, ns = 0, nc = 0; const seen = new Set();
   (function walk(n) { if (!n) return; if (n.t === 'f') { nf++; return; } if (n.t === 's') { ns++; return; } if (n.t === 'c') { nc++; n.cards.forEach(c => walk(n.ch[c])); return; } n.ch.forEach(walk); })(g.root);
   const work = g.decisions.reduce((a, d) => a + g.n[d.p] * d.na, 0);
-  s.iterate(1); const reps = work > 3e7 ? 2 : work > 3e6 ? 5 : 40;
+  s.iterate(1); const reps = work > 3e7 ? 4 : work > 3e6 ? 10 : 40;
   const t1 = Date.now(); s.iterate(reps); const per = (Date.now() - t1) / reps;
   const r = { name, decisions: g.decisions.length, work, foldLeaves: nf, showLeaves: ns, chance: nc, n: g.n, memMB: g.memBytes / 1e6, buildMs: tb, msPerIter: per };
   res.push(r); console.log(JSON.stringify(r));

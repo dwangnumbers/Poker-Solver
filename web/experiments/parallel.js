@@ -10,11 +10,11 @@ const { E, SPOTS } = require('./spots.js'), { Pool } = require('../js/pool.js'),
     for (const K of [1, 2]) {
       const P = await Pool.create(cfg, { workers: K }); await P.iterate(1);
       t0 = Date.now(); await P.iterate(3); const tPool = (Date.now() - t0) / 3;
-      // coordinator time per pass and data moved per pass (reach vectors out, sums back)
-      const c = P.coord, g = P.g; let tc = Date.now(); for (let k = 0; k < 10; k++) { const rr = c.collectTop(0, 0); c.finishTop(0, 0, rr.map(r => r ? new Float64Array(g.n[0]) : null)); } tc = (Date.now() - tc) / 10;
-      const tops = g.top.length, bytes = tops * (g.n[0] + g.n[1]) * 8 + tops * g.n[0] * 8;
-      // the same iterates: compare against a fresh sequential run of 4 iterations
+      // the same iterates: compare with the sequential run of 4 iterations
       const r = await P.evaluate();
+      // coordinator time per pass (value mode, no updates) and data moved per pass (reach vectors out, sums back)
+      const c = P.coord, g = P.g; let tc = Date.now(); for (let k = 0; k < 10; k++) { const rr = c.collectTop(0, 2); c.finishTop(0, 2, rr.map(r => r ? new Float64Array(g.n[0]) : null)); } tc = (Date.now() - tc) / 10;
+      const tops = g.top.length, bytes = tops * (g.n[0] + g.n[1]) * 8 + tops * g.n[0] * 8;
       res.rows.push({ spot: key, K, msSeq: tSeq, msPool: tPool, coordMsPerPass: tc, topNodes: tops, bytesPerPassPerWorker: bytes, explSeq: ev.expl, explPool: r.expl, equal: ev.expl === r.expl });
       console.log(JSON.stringify(res.rows[res.rows.length - 1]));
       P.terminate();

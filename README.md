@@ -1,46 +1,52 @@
 # Poker-Solver
 
-A small, readable poker solver in Python, written for a one-hour talk at the Numerical Analysis Research Club
-on the mathematics behind poker solvers. It adds a new idea: a **second-order "finish"** for the solve.
+A poker solver built on one algorithm, discounted counterfactual regret minimisation (DCFR), with a site that runs
+in the browser and a talk on its numerical analysis for the Numerical Analysis Research Club.
 
-The solver has two parts:
+**Site** (GitHub Pages, `main` branch, `/docs` folder):
 
-1. **Range-vectorised CFR.** CFR, CFR⁺, DCFR and PCFR⁺ run on the public game tree with alternating updates.
-   This is the first-order method that every practical poker solver is built on.
-2. **A second-order finish.** The finish works in four steps:
-   - Take the support predicted by a few thousand DCFR iterations.
-   - Restrict the game to the actions in that support and to the positions both players can reach with them.
-   - Solve the restricted sequence-form equilibrium conditions exactly, as a skew-monotone variational inequality.
-     The solver is a proximal-point loop with an interior-point crossover and semismooth (active-set) Newton steps.
-   - Verify the result in the full game with exact best responses. Add back any profitable pruned action, and
-     repeat.
+- **Postflop.** Flop, turn and river spots: board, pot, stack, rake, two ranges and a bet tree per street and player.
+  The solve runs in parallel Web Workers and reports exploitability as a percentage of the pot. The strategy browser
+  walks the tree, chooses turn and river cards, and shows strategy, EV and equity per hand class and combination.
+  Node locking, CSV export, memory estimate before building.
+- **Preflop and multiway.** Two to six players over the 169 hand classes, with open, 3-bet, 4-bet and all-in sizes,
+  antes and limps. Exact card removal between classes; three-way showdowns through a low-rank equity tensor.
+  Reports NashConv, since DCFR has no guarantee with more than two players.
+- **Flop reports.** One spot solved on a stratified, weighted subset of the 1,755 distinct flops, with summary and
+  CSV.
+- **Talk demo.** The single-street river table of the earlier talk.
+- **Methods.** The numerical methods and a short guide.
 
-The talk is in `tex/`: `talk.pdf` has the slides and `talk-notes.pdf` the speaker notes. A longer version of the
-deck, with every citation and the extra technical slides, is `talk-detailed.pdf`.
+**Talk.** `tex/talk.pdf` (slides) and `tex/talk-notes.pdf` (speaker notes): *Range-Vectorized Discounted Regret
+Minimization for No-Limit Hold'em: Complexity, Precision and Parallelism*. `app/DEMO_NOTES.md` is the script for the
+live demonstration. The earlier deck on the second-order finish is `tex/talk-newton.pdf`.
 
-## Interactive demonstration
+## Layout
 
-`app/poker-solver.html` is a single self-contained page. Open it in any browser; it needs no server and no network.
-It shows a river hand on a poker table and solves it live:
+| path | contents |
+|---|---|
+| `web/js/engine.js` | multi-street engine: tree builder, DCFR, O(n) fold and showdown leaves, analysis, locking |
+| `web/js/pool.js`, `worker.js` | parallel solving: coordinator above the first chance node, workers below it, split by card |
+| `web/js/preflop.js` | preflop and multiway DCFR over hand classes |
+| `web/js/flops.js` | the 1,755 suit-isomorphic flops and stratified subsets |
+| `web/pages`, `web/css`, `web/js/*-ui.js`, `postflop.js`, `reports.js` | the site pages |
+| `web/build.py` | assembles the site into `docs/` |
+| `web/data`, `web/tools` | preflop equity tables and the scripts that compute them |
+| `web/test` | correctness tests (river against the earlier solver, turn against an exact LP, partition, locks, rake) |
+| `web/experiments` | every measurement in the talk (`run_all.sh`), results in `out/` |
+| `tex/make_talk_data.py` | figures and tables of the talk from the experiment results |
+| `solver/`, `app/` | the earlier Python solver and the river table |
 
-- **The table.** Click a board card to change it, click a player's cards to choose a hand, and click the action
-  buttons to play the hand. The pot, the stacks and the bets follow along.
-- **Range grids.** One tab for each player. For the player to act, every hand is coloured by action, with a
-  separate colour for each bet size. For the other player, the grid shows how much of each hand is still in the
-  range. Click a square to see the strategy and the value of each individual hand. Ranges can be painted or typed.
-- **Game tree.** The public betting tree with the solved frequency on every branch. It follows the hand as it is
-  played, and any point can be clicked.
-- **Algorithm comparison.** CFR, CFR⁺, DCFR and PCFR⁺ race on the spot you set up, and their exploitability is
-  plotted against iterations.
+## Building
 
-The solver core is `app/src/solver.js`, a JavaScript port of `solver/cfr.py` with an O(n) evaluation of each leaf
-(sorted running sums with a card-removal correction). On the talk example it agrees with the Python solver: after
-5 000 DCFR iterations both report an exploitability of 1.34e-4 chips. One iteration takes about a millisecond.
+```
+python3 web/build.py                 # site into docs/
+node web/test/turn_check.js          # one of the tests
+bash web/experiments/run_all.sh      # all experiments (about an hour on two cores)
+python3 tex/make_talk_data.py        # figures and tables, then pdflatex tex/talk.tex
+```
 
-`app/DEMO_NOTES.md` (also as a PDF) has the speaking notes for a twelve minute demonstration, and the same steps are
-built into the page under **Demo guide**. To rebuild the page after editing `app/src/`, run `python3 app/build.py`.
-
-## The idea
+## Earlier work: a second-order finish for river subgames
 
 With realisation plans `x, y`, information-set values `p, q`, and the sequence-form matrices `E, F, A`, a Nash
 equilibrium is a solution of

@@ -19,7 +19,7 @@
     return `<${tag || 'span'} class="pcard c-${s} ${extra || ''}" ${tag === 'button' ? 'type="button"' : ''} data-c="${c}" aria-label="${r} of ${SUITNAME[s]}"><span class="r">${r}</span><span class="u">${SYM[s]}</span></${tag || 'span'}>`;
   }
   const cardText = c => `<span class="cardtag c-${E.SUITS[c & 3]}">${E.RANKS[c >> 2]}${SYM[E.SUITS[c & 3]]}</span>`;
-  const comboText = k => cardText(E.COMBO_A[k]) + cardText(E.COMBO_B[k]);
+  const comboText = k => { const a = E.COMBO_A[k], b = E.COMBO_B[k]; return (a >> 2) >= (b >> 2) ? cardText(a) + cardText(b) : cardText(b) + cardText(a); };   // higher rank first
   const parseBoard = s => { const t = String(s).replace(/[\s,]/g, ''); const out = []; for (let i = 0; i + 1 < t.length; i += 2) { const c = E.cardOf(t.slice(i, i + 2)); if (!(c >= 0)) throw new Error('cannot read card ' + t.slice(i, i + 2)); out.push(c); } return out; };
 
   /* colours of actions, as in commercial solvers: passive green, fold blue, bets from light to dark red */

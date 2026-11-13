@@ -105,7 +105,8 @@
       }
       n.ch.forEach(pruneLimps);
     }
-    tree.decisions = []; (function collect(n) { if (n.t !== 'd') return; n.id = tree.decisions.length; tree.decisions.push(n); n.ch.forEach(collect); })(tree.root);
+    tree.decisions = []; tree.terminals = 0;
+    (function collect(n) { if (n.t !== 'd') { tree.terminals++; return; } n.id = tree.decisions.length; tree.decisions.push(n); n.ch.forEach(collect); })(tree.root);
     for (const d of tree.decisions) { d.R = new Float32Array(NC * d.na); d.S = new Float32Array(NC * d.na); }
     return tree;
   }
