@@ -8,6 +8,7 @@ node ../tools/equity_tables.js 50000 0 999 _b > out/eq2b.log 2>&1         # an i
 python3 ../tools/eq3_lowrank.py 16 > out/lowrank.log 2>&1                  # low-rank factors and their errors
 node ../test/river_vs_old.js > out/river_old.log 2>&1                      # validation against the earlier solver
 node ../test/turn_check.js > out/turn_lp.log 2>&1                          # validation against an exact LP, one chance level
+node ../test/turn_check.js 40 35 turn_lp_mid40 > out/turn_lp_mid40.log 2>&1     # mid-size exact LP
 node ../test/flop_check.js > out/flop_lp.log 2>&1                          # validation against an exact LP, two chance levels
 node ../test/exact_dcfr.js > out/exact_dcfr.log 2>&1                       # the zero-reach shortcut gives the plain DCFR iterates
 node memest.js > out/memest.log 2>&1
