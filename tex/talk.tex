@@ -17,6 +17,7 @@
 \usepackage{lmodern}
 \usepackage{amsmath,amssymb,mathtools}
 \usepackage{booktabs}
+\usepackage{array}
 \usepackage{xcolor}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,shapes.geometric,fit,backgrounds,decorations.pathreplacing}
@@ -70,8 +71,7 @@
 \newcommand{\cardback}{\tikz[baseline=-0.7ex]{\node[draw=white,fill=suitred!80!black,rounded corners=2pt,
   minimum width=0.42cm,minimum height=0.6cm,inner sep=0pt]{};}}
 
-\title{Solving Poker}
-\subtitle{The numerical analysis behind poker solvers\\ --- and a second-order finish for them}
+\title{Certified High-Precision Equilibria for Poker Subgames\\ via Support-Restricted Proximal Newton Methods}
 \author{Numerical Analysis Research Club}
 \date{}
 
@@ -85,7 +85,7 @@
 Regret minimisation and CFR 9 $\cdot$ Live demonstration 12 $\cdot$ The new method 13 $\cdot$ Results, limits and wrap-up 8.
 That leaves about four minutes for questions during the talk.\\[4pt]
 If running late, shorten the demonstration to its five minute version (see \texttt{app/DEMO\_NOTES.md}) and give the slide
-``Making it robust and fast'' one sentence.\\[4pt]
+``Interior-point crossover and quasi-definite factorization'' one sentence.\\[4pt]
 Opening line: ``Ten years ago the best poker players in the world lost to programs whose core is a few lines of
 arithmetic repeated a few billion times. This talk is about that arithmetic, read as numerical analysis, and about
 what a numerical analyst can add to it.''\\[4pt]
@@ -96,25 +96,22 @@ version of this deck, with all citations and extra slides, is \texttt{talk-detai
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Ten years of superhuman poker}
+\begin{frame}{Background: computational poker, 2015 to 2019}
 \begin{columns}[T]
 \column{0.58\textwidth}
-In 2015 a program called Cepheus essentially solved two-player limit hold'em.
+Cepheus (2015) essentially solved heads-up limit hold'em. DeepStack and Libratus (2017) defeated professional players
+at heads-up no-limit hold'em, and Pluribus (2019) did so with six players.
 
 \medskip
-In 2017 two programs, DeepStack and Libratus, beat professional players at the no-limit game, which is far larger.
-In 2019 Pluribus did the same at a table of six.
+Commercial solvers now compute equilibrium strategies for user-specified subgames.
 
 \medskip
-Today every serious player studies with a \alert{solver}. You describe one situation, and the program computes how
-to play every possible hand in it.
-
-\medskip
-All of these programs share one simple iteration. This talk explains it and then tries to improve on it.
+All of these systems are built on counterfactual regret minimization (CFR). We analyze CFR as a numerical method and
+propose a second-order refinement.
 \column{0.4\textwidth}
 \centering
 \includegraphics[height=0.6\textheight,trim=0 22 245 0,clip]{grid_root.pdf}\\[-2pt]
-{\scriptsize\color{ink2} A solver's answer, computed by our own code. Each square is a starting hand and the colours are actions.}
+{\scriptsize\color{ink2} Equilibrium strategy for the big blind's first action, computed with our solver. Cells are hand classes and colours are actions.}
 \end{columns}
 \note{
 The common core of all these programs is an iterative method, counterfactual regret minimisation, applied to a very large
@@ -128,12 +125,12 @@ References if asked: Bowling et al., Science 2015. Morav\v{c}\'ik et al., Scienc
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{The plan: poker $\leftrightarrow$ math}
+\begin{frame}{Outline}
 \centering
 \begin{tikzpicture}[x=1cm,y=1cm,every node/.style={font=\scriptsize}]
-  \foreach \i/\t/\c in {0/{Hold'em,\\ one river}/felt, 1/{Games and\\ equilibria}/cblue, 2/{Bluffing and\\ pot odds}/felt,
-                       3/{A linear\\ program}/cblue, 4/{Regret\\ and CFR}/cblue, 5/{Live\\ solver}/felt,
-                       6/{A Newton\\ finish}/corange, 7/{Results\\ and limits}/corange}{
+  \foreach \i/\t/\c in {0/{River\\ subgame}/felt, 1/{Zero-sum\\ games}/cblue, 2/{Mixed\\ strategies}/felt,
+                       3/{Sequence-\\form LP}/cblue, 4/{Regret\\ and CFR}/cblue, 5/{Demon-\\stration}/felt,
+                       6/{Proximal\\ Newton}/corange, 7/{Results}/corange}{
     \node[draw=\c,line width=1pt,rounded corners=3pt,text width=1.25cm,minimum height=1.1cm,align=center,
           inner sep=2pt,fill=\c!8] (n\i) at (1.7*\i,0) {\t};
   }
@@ -142,15 +139,12 @@ References if asked: Bowling et al., Science 2015. Morav\v{c}\'ik et al., Scienc
 
 \vspace{1.4em}
 \raggedright
-The equilibrium of a poker game is the solution of a very large and very structured saddle-point problem.
-Solvers attack it with a first-order method whose steps are cheap and whose last digits are slow.
+A poker equilibrium is the solution of a large, structured bilinear saddle-point problem. First-order methods such as
+CFR are inexpensive per iteration but converge sublinearly.
 
 \medskip
-In the middle of the talk we solve a real hand live in the browser and look at the answer together.
-
-\medskip
-Our own contribution comes last. We treat the end of the solve as a nonsmooth equation and finish it with a Newton
-method, which reaches machine precision where the first-order method would need millions of iterations.
+We demonstrate a river subgame solver, then present a proximal Newton refinement that reaches machine precision with a
+best-response certificate.
 \note{
 Say what the audience will get. First, enough poker to read the output of a solver. Second, the mathematics of why CFR converges
 and why it is fast in practice. Third, a live demonstration in which they can ask for any change to the hand. Fourth, a new method
@@ -159,18 +153,18 @@ from the numerical optimisation toolbox, with honest results: where it wins by o
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Texas hold'em in one slide}
+\begin{frame}{Heads-up no-limit hold'em}
 \begin{columns}[T]
 \column{0.5\textwidth}
-Each of the two players is dealt two private cards. Five public cards, the \emph{board}, are then revealed in three
-stages called the flop, the turn and the river.
+Each player receives two private cards. Five public cards, the \emph{board}, are dealt in three stages: flop, turn and
+river.
 
 \medskip
-There is a round of betting before the flop and after each stage. A player may check, bet, call, raise or fold, and in the
-no-limit game a bet can be any size up to the player's stack.
+A betting round follows each stage. The actions are check, bet, call, raise and fold, and in no-limit play a bet may
+be any amount up to the stack.
 
 \medskip
-If nobody folds, the best five-card hand made from the seven available cards wins the pot.
+At showdown the best five-card hand from seven cards wins the pot.
 \column{0.48\textwidth}
 \centering
 \begin{tikzpicture}
@@ -184,8 +178,7 @@ If nobody folds, the best five-card hand made from the seven available cards win
   \node[text=white,font=\scriptsize] at (-1.55,-1.3) {Big blind (OOP)};
   \node[text=white,font=\scriptsize] at (1.55,-1.3) {Button (IP)};
 \end{tikzpicture}\\[4pt]
-{\small Our running example is the \alert{river}, the last round of betting.\\
-The big blind acts first, which is called being out of position.}
+{\small Running example: a \alert{river} subgame.\\ The big blind acts first (out of position).}
 \end{columns}
 \note{
 Keep this light, since most of the audience has played or watched poker. The key structural fact is that the board is
@@ -199,21 +192,19 @@ The live demonstration uses exactly this table.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Ranges: what a solver takes as input}
+\begin{frame}{Ranges}
 \begin{columns}[T]
 \column{0.6\textwidth}
 \centering
 \includegraphics[width=\linewidth]{ranges.pdf}
 \column{0.38\textwidth}
-A \textbf{range} is a probability vector over the two-card hands a player can hold. There are 1326 such hands, and 1081
-once the five board cards are known.
+A \textbf{range} is a probability vector over the 1326 two-card hands, of which 1081 are consistent with the board.
 
 \medskip
-In our example the big blind called a raise before the flop and the button made that raise, so the two ranges are
-different.
+The two ranges differ because the button raised and the big blind called before the flop.
 
 \medskip
-The solver returns, for every point of the betting and for every hand, a probability for each action.
+A solver returns an action distribution for every hand at every decision point.
 \end{columns}
 \note{
 The 13 by 13 grid is the standard poker picture. Pairs are on the diagonal, suited hands above it and offsuit hands below it.
@@ -226,17 +217,16 @@ are fewer hands with a king.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Two-player zero-sum games and Nash equilibrium}
-Each player chooses a strategy from a compact convex set, $x\in X$ and $y\in Y$, and the first player receives the
-bilinear payoff $x^\top A y$ from the second.
+\begin{frame}{Zero-sum games, Nash equilibrium and exploitability}
+Strategies lie in compact convex sets, $x\in X$ and $y\in Y$, and the payoff $x^\top A y$ is bilinear.
 \begin{block}{Minimax theorem (von Neumann 1928)}
 \[ \max_{x\in X}\min_{y\in Y} x^\top A y \;=\; \min_{y\in Y}\max_{x\in X} x^\top A y \;=:\; v^\ast . \]
 \end{block}
-A pair $(x^\ast,y^\ast)$ that attains both sides is a \textbf{Nash equilibrium}, and $v^\ast$ is the value of the game.
-Playing $x^\ast$ guarantees at least $v^\ast$ against any opponent, which is what poker players mean by an unexploitable strategy.
-\begin{block}{The error that every solver reports is the exploitability}
-\[\ex(x,y) \;=\; \tfrac12\Big(\max_{x'} x'^\top A y \;-\; \min_{y'} x^\top A y'\Big)\;\ge 0 ,
-  \qquad\text{with equality exactly at an equilibrium.}\]
+A pair $(x^\ast,y^\ast)$ attaining both sides is a \textbf{Nash equilibrium}. Each equilibrium strategy guarantees
+$v^\ast$ against every opponent.
+\begin{block}{Exploitability}
+\[\ex(x,y) \;=\; \tfrac12\Big(\max_{x'} x'^\top A y \;-\; \min_{y'} x^\top A y'\Big)\;\ge 0 ,\]
+with equality if and only if $(x,y)$ is an equilibrium.
 \end{block}
 \note{
 For an applied mathematics audience this is a convex-concave saddle-point problem with a bilinear coupling, and the exploitability
@@ -247,33 +237,29 @@ Our numbers are in chips with a pot of 100, so $10^{-2}$ chips is $10^{-4}$ of t
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Why equilibria mix: bluffing and pot odds}
+\begin{frame}{Mixed strategies and the indifference principle}
 \begin{columns}[T]
 \column{0.56\textwidth}
-Take a toy river with a pot of 1. The bettor holds either the best hand or nothing and bets $s$. The caller holds a
-medium hand that only beats a bluff.
+Toy river with pot 1. The bettor holds the nuts or air and bets $s$. The caller holds a bluff-catcher.
 
 \medskip
-The caller is indifferent between calling and folding when bluffs are a fraction $\beta = \dfrac{s}{1+2s}$ of the bets.
+Indifference of the caller fixes the bluff fraction $\beta$, and indifference of the bluffing hands fixes the calling
+frequency $c$, the \emph{minimum defence frequency} (MDF):
+\[ \beta = \frac{s}{1+2s}, \qquad c = \frac{1}{1+s}. \]
 
 \medskip
-The bettor's bluffs are indifferent when the caller continues with probability $\dfrac{1}{1+s}$. Poker players call
-this the \emph{minimum defence frequency}.
-
-\medskip
-Any pure strategy can be exploited here. The equilibrium randomises, and it does so exactly where the opponent
-is made indifferent.
+Every pure strategy is exploitable. Each player mixes so that the opponent is indifferent.
 \column{0.4\textwidth}
 \centering
 \begin{tabular}{ccc}
 \toprule
-bet $s$ & bluffs $\beta$ & defend \\ \midrule
+bet $s$ & bluffs $\beta$ & MDF \\ \midrule
 $1/3$ & 20\% & 75\% \\
 $3/4$ & 30\% & 57\% \\
 $1$ & 33\% & 50\% \\
 $2$ & 40\% & 33\% \\ \bottomrule
 \end{tabular}\\[10pt]
-{\small We will check the last column against the live solver.}
+{\small The MDF column is compared with the solver below.}
 \end{columns}
 \note{
 Derivation, to say and not to write. For the caller, calling wins $1+s$ against a bluff and loses $s$ against a value bet.
@@ -285,14 +271,14 @@ complementary slackness in the linear program that we are about to write down. M
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Games on trees with hidden information}
+\begin{frame}{Extensive-form games with imperfect information}
 \begin{columns}[T]
 \column{0.52\textwidth}
-Poker is a game tree. Chance deals the cards, the players act in turn, and the leaves carry the payoffs.
+Chance deals the cards, the players act in turn, and the leaves carry payoffs.
 
 \medskip
-A player cannot see the opponent's cards, so several nodes look the same to that player. Such a group of
-nodes is an \textbf{information set}, and a strategy assigns a probability distribution over actions to each one.
+Nodes that a player cannot distinguish form an \textbf{information set}. A behavioural strategy assigns one action
+distribution to each information set.
 
 \medskip
 {\footnotesize
@@ -322,7 +308,7 @@ No-limit hold'em & about $10^{161}$ \\ \bottomrule
                edge from parent node[right,font=\tiny,text=ink2] {check} } };
   \draw[corange,dashed,thick,rounded corners=4pt] ($(b2)+(-0.24,0.24)$) rectangle ($(d2)+(0.24,-0.24)$);
 \end{tikzpicture}\\[2pt]
-{\scriptsize Player 2 sees that player 1 bet but not which card was dealt, so the two boxed nodes are one information set.}
+{\scriptsize Player 2 observes the bet but not the deal, so the boxed nodes form one information set.}
 \end{columns}
 \note{
 Leduc hold'em is the standard research benchmark. It has a deck of six cards, one private
@@ -335,18 +321,17 @@ Kuhn and Leduc were counted by our code.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{The sequence form: equilibrium is a linear program}
-Give player 1 one variable $x_\sigma$ for each \emph{sequence} $\sigma$ of her own
-actions, equal to the product of her probabilities along it. These variables satisfy linear flow constraints
-$Ex = e$, $x\ge 0$, and the expected payoff is bilinear in them, $u(x,y) = x^\top A y$.
+\begin{frame}{The sequence-form linear program}
+A \emph{realization plan} assigns to each sequence $\sigma$ of player 1's actions the product $x_\sigma$ of her action
+probabilities along $\sigma$. Realization plans satisfy the flow constraints $Ex = e$, $x\ge 0$, and the expected payoff is
+bilinear, $u(x,y) = x^\top A y$.
 \begin{block}{Theorem (Koller, Megiddo and von Stengel 1996)}
 An equilibrium strategy of player 1 solves
 \[\max_{x,\,q}\ f^\top q\quad \text{subject to}\quad A^\top x - F^\top q \ge 0,\quad Ex = e,\quad x\ge 0 ,\]
-a linear program whose size is \emph{linear} in the size of the game tree.
+a linear program of size linear in the game tree.
 \end{block}
-So why not call an LP solver? On our river $A$ has 2.9 million nonzeros, because every leaf couples every hand of one
-player to every hand of the other, and a good LP code did not finish in 25 minutes. The iteration we describe next
-reaches $\MedDCFRExpl$ chips in \MedDCFRTime\ seconds.
+On our river $A$ has 2.9 million nonzeros, since each leaf contributes a dense hand-by-hand block. HiGHS did not
+terminate within 25 minutes. DCFR reaches $\MedDCFRExpl$ chips in \MedDCFRTime\ seconds.
 \note{
 This is the key modelling step. Mixed strategies over the pure strategies of the normal form would have exponentially many
 variables. Realisation plans have one variable per sequence, and perfect recall makes the payoff bilinear in them.\\[3pt]
@@ -362,18 +347,17 @@ problems the LP is perfectly fine: 0.04 s on Leduc and 1.6 s on a small river. T
 \begin{frame}{Regret matching}
 \begin{columns}[T]
 \column{0.62\textwidth}
-We face the same decision many times. The \emph{regret} $R_T(a)$ of an action is how much better it would have done
-than what we played. Regret matching plays each action in proportion to its positive regret.
+Regret matching plays each action in proportion to its positive cumulative regret.
 {\small\[ R_T(a) = \sum_{t=1}^T \big(u_t(a) - u_t(\sigma_t)\big),\quad
    \sigma_{T+1}(a) = \frac{[R_T(a)]^+}{\sum_b [R_T(b)]^+}. \]}
 \begin{block}{Theorem (Hart and Mas-Colell 2000)}
-The regrets grow only like $\sqrt{T}$: $\ \max_a R_T(a) \le \Delta\sqrt{|A|\,T}$.
+$\max_a R_T(a) \le \Delta\sqrt{|A|\,T}$, where $\Delta$ is the payoff range.
 \end{block}
-When both players of a zero-sum game do this, their \emph{average} strategies converge to an equilibrium.
+In self-play on a zero-sum game the \emph{average} strategies converge to an equilibrium.
 \column{0.36\textwidth}
 \centering
 \includegraphics[width=\linewidth]{rm_rps.pdf}\\
-{\scriptsize Our computation on a weighted rock-paper-scissors game. The current strategy cycles and the average converges.}
+{\scriptsize Weighted rock-paper-scissors. The iterate cycles and the average converges.}
 \end{columns}
 \note{
 Idea of the proof. The regret vector satisfies $\|[R_{T}]^+\|^2 \le \|[R_{T-1}]^+\|^2 + \Delta^2|A|$ because the
@@ -386,17 +370,15 @@ In the figure the limit is $(\frac14,\frac12,\frac14)$.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Counterfactual regret minimisation (CFR)}
-CFR runs regret matching separately at every information set $I$. The payoff it feeds to each one is the
-\textbf{counterfactual value} of an action, which is the expected payoff weighted by the probability that the opponent and
-chance lead to $I$, as if the player herself had tried to get there.
-\[ v_i(\sigma, I, a) = \sum_{h\in I}\ \pi_{-i}^{\sigma}(h)\sum_{z \sqsupset ha} \pi^{\sigma}(ha\to z)\, u_i(z) \]
+\begin{frame}{Counterfactual regret minimization}
+CFR runs regret matching independently at each information set $I$. The payoff is the \textbf{counterfactual value},
+weighted by the probability that chance and the opponent reach $I$:
+\[ v_i(\sigma, I, a) = \sum_{h\in I}\ \pi_{-i}^{\sigma}(h)\sum_{z \sqsupset ha} \pi^{\sigma}(ha\to z)\, u_i(z) . \]
 \begin{block}{Theorem (Zinkevich, Johanson, Bowling and Piccione 2007)}
-The regret of the whole strategy is at most the sum of the local regrets. Therefore the average strategies satisfy
+The total regret is bounded by the sum of the local counterfactual regrets. Hence
 \[ \ex(\bar x_T,\bar y_T) \ \le\ \frac{\Delta\,|\mathcal I|\sqrt{|A|}}{\sqrt T}. \]
 \end{block}
-One iteration is one pass over the tree, with reach probabilities computed on the way down and values on the way up.
-The matrix $A$ is never formed.
+Each iteration is one tree traversal, and $A$ is never formed.
 \note{
 The decomposition is the whole trick. A global regret over an exponentially large strategy space is bounded by a sum of small
 local regrets, and each of them is minimised by plain regret matching. This is why CFR scales: the cost of an iteration is linear in the tree
@@ -407,18 +389,16 @@ These are the same two products that any first-order saddle-point method needs.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{CFR for poker: one pass for all hands}
-In poker the betting is public and only the cards are hidden. At each point of the betting we store
-\emph{vectors} indexed by hands, such as the reach probabilities $\pi_1$ and $\pi_2$.
-At a leaf the values of all hands come from one matrix-vector product.
+\begin{frame}{Range-vectorized CFR on the public tree}
+Betting is public and only the cards are private. Each public node stores vectors indexed by hand, such as the reach
+probabilities $\pi_1$ and $\pi_2$, and leaf values are matrix-vector products:
 \[ v_1 = \text{amount}\cdot B\,\pi_2,\qquad
    B_{ij} = \underbrace{C_{ij}}_{\text{no shared card}}\cdot\begin{cases} 1 & \text{after a fold}\\ \operatorname{sign}(s_i - s_j) & \text{at a showdown}\end{cases} \]
-Here $s_i$ is the strength of hand $i$. The matrix $B$ is dense but very structured. Once the hands are sorted by
-strength, the sign matrix is all ones below the diagonal and all minus ones above it, and $C$ is the all-ones matrix
-minus a sparse correction for hands that share a card.
+Here $s_i$ is the strength of hand $i$. After sorting by strength the sign matrix is $+1$ below the diagonal and $-1$
+above it, and $C$ is the all-ones matrix minus a sparse card-removal correction.
 
 \medskip
-As a result $B\pi$ costs one sort and a running sum, which is $O(n\log n)$ operations and not $n^2$.
+Hence $B\pi$ costs $O(n\log n)$ operations instead of $O(n^2)$.
 \note{
 This is the bridge between the tree picture and the implementation. The information sets at a public node are indexed by the
 private hand of the player to act, so all information sets at this node form a vector and every CFR operation becomes a vector operation.\\[3pt]
@@ -431,22 +411,22 @@ scalable Newton method would have to exploit, which comes back at the end of the
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Four variants of one loop}
-Modern solvers change how CFR weights the old regrets and how it averages the strategies.
+\begin{frame}{CFR$^+$, DCFR and PCFR$^+$}
+Modern variants modify the regret update and the averaging weights.
 
 \smallskip
 \renewcommand{\arraystretch}{1.15}\small
-\begin{tabular}{p{1.5cm}p{6.4cm}p{5.0cm}}
+\begin{tabular}{p{1.5cm}>{\raggedright\arraybackslash}p{6.4cm}>{\raggedright\arraybackslash}p{5.0cm}}
 \toprule
-method & what changes & a numerical analyst would say \\ \midrule
-CFR$^+$ & Negative regrets are reset to zero and later strategies get more weight in the average. & projection onto the nonnegative orthant \\
-DCFR & Old regrets and old strategies are multiplied by factors below one. & forgetting factors that damp the transient \\
-PCFR$^+$ & The strategy is computed from the regrets plus a prediction of the next regret. & optimism, as in the extragradient method \\ \bottomrule
+method & modification & interpretation \\ \midrule
+CFR$^+$ & Regrets clipped at zero, linear averaging weights. & Projection onto the nonnegative orthant. \\
+DCFR & Regrets and averages discounted, $(\alpha,\beta,\gamma) = (1.5, 0, 2)$. & Forgetting factors. \\
+PCFR$^+$ & Strategy computed from the regrets plus a predicted regret. & Optimism, as in extragradient methods. \\ \bottomrule
 \end{tabular}
 
 \smallskip
-\normalsize The proven rate is still $T^{-1/2}$ for all four. In practice the modern variants are much faster, and we will
-now race them against each other on a real hand.
+\normalsize All variants update the players alternately (Gauss--Seidel). All share the $O(T^{-1/2})$ bound, and the
+modern variants are much faster in practice.
 \note{
 CFR$^+$ (Tammelin 2014) is what solved limit hold'em. DCFR (Brown and Sandholm 2019) with parameters $(1.5, 0, 2)$ is the default in many solvers:
 positive regrets are multiplied by $t^{1.5}/(t^{1.5}+1)$, negative ones by $1/2$, and the average by $(t/(t+1))^2$.
@@ -458,23 +438,23 @@ theory is an open question. The rates are still sublinear, and that is the gap o
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Live demonstration: the river solver table}
+\begin{frame}{Demonstration: a river subgame solver}
 \begin{columns}[T]
 \column{0.61\textwidth}
 \centering
 \includegraphics[width=\linewidth]{app_slide.png}\\[3pt]
-{\scriptsize The big blind's answer to a three-quarter-pot bet. Each square is a starting hand; blue folds, green calls, red raises all-in.}
+{\scriptsize Big blind facing a 75-chip bet. Blue: fold. Green: call. Red: all-in.}
 \column{0.37\textwidth}
 \small
-The page \texttt{app/poker-solver.html} solves our river in the browser. It will answer five questions.
+\texttt{app/poker-solver.html} solves the river subgame in the browser. We examine:
 \begin{enumerate}\setlength\itemsep{1pt}
-\item Which of the four algorithms wins a race?
-\item What does the big blind do with each of its 473 hands?
-\item How do the ranges and the tree change as the hand is played?
-\item Does a hand that mixes get the same value from both actions?
-\item Does the solver agree with the pot odds formula?
+\item the convergence of CFR, CFR$^+$, DCFR and PCFR$^+$,
+\item the big blind's strategy over its 473 hands,
+\item the ranges along the game tree,
+\item action values of mixed hands,
+\item agreement with the minimum defence frequency.
 \end{enumerate}
-After that the board, the ranges and the bet sizes are yours to change.
+The board, ranges and bet sizes are adjustable.
 \end{columns}
 \note{
 Switch to the browser now. The full script with what to click and what to say is in \texttt{app/DEMO\_NOTES.md} (also as a PDF),
@@ -491,22 +471,22 @@ If the browser fails, the static grids are in \texttt{talk-detailed.pdf}, slides
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{What the demonstration showed}
+\begin{frame}{Equilibrium structure and minimum defence frequency}
 \begin{columns}[T]
 \column{0.42\textwidth}
-The solution reads like poker. Strong hands bet, a few hands with nothing bluff, and the hands in between check.
+The equilibrium is polarized. Strong hands and some weak hands bet, and medium hands check.
 
 \medskip
-A hand that mixes two actions gets the same value from both. This is complementary slackness.
+Mixed hands have equal action values, as complementary slackness requires.
 
 \medskip
-Against the big blind's bets the button defends within 1.5 points of the pot odds formula. Against the button's bets
-and against all-in raises the defender folds much more, because there the bluffs give up something by betting.
+Against the big blind's bets, defence is within 1.5 points of the MDF. Against the button's bets and against all-in
+raises it is far lower, because there the bluffing hand's alternative action has positive value.
 \column{0.57\textwidth}
 \centering
 {\scriptsize\setlength\tabcolsep{3pt}
 \input{mdf_table.tex}}\\[6pt]
-{\scriptsize Exact equilibrium of our river. Here $s$ is the bet as a fraction of the pot, MDF is $1/(1+s)$, and a jam is an all-in bet.}
+{\scriptsize Exact equilibrium. $s$ is the bet as a fraction of the pot, $\mathrm{MDF} = 1/(1+s)$, and a jam is an all-in bet.}
 \end{columns}
 \note{
 This is a consistency check of the whole pipeline. When the big blind bets, the button defends 74.3\% against 75.2\%, 55.8\% against
@@ -520,22 +500,21 @@ browser showed after 1000 iterations.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Why push the precision further?}
+\begin{frame}{Motivation for high-precision solutions}
 \begin{columns}[T]
 \column{0.58\textwidth}
-Practical solvers stop at about 0.1\% of the pot, and for a human studying a hand that is plenty.
+Practical solvers stop near 0.1\% of the pot.
 
 \medskip
-More digits matter when a program stitches many small solves together and their errors add up, when we ask exactly which
-hands mix, and when research needs a ground truth with a certificate.
+Higher precision is needed for repeated real-time re-solving, for identifying the exact support, and for certified
+reference solutions.
 
 \medskip
-For a numerical analyst, CFR is a first-order method on a nonsmooth and degenerate problem. It is
-robust and cheap, and its tail is sublinear. The classical cure for a slow tail is a \alert{local method of higher
-order}, started from a good point.
+CFR is a first-order method on a nonsmooth, degenerate problem, and its tail is sublinear. The standard remedy is a
+\alert{locally superlinear method} started from a good initial point.
 \column{0.4\textwidth}
 \includegraphics[width=\linewidth]{avg_vs_last.pdf}\\
-{\scriptsize Our computation on Leduc. Only the average converges, and each extra digit costs about ten times more iterations.}
+{\scriptsize Leduc. Only the average converges, and each additional digit costs about ten times more iterations.}
 \end{columns}
 \note{
 Make the case without overselling. Precision matters for machines (solving subgames again, evaluation) and for science
@@ -547,20 +526,20 @@ Numbers for Leduc: CFR$^+$ reaches $\LeducCFRplusLong$ after 50{,}000 iterations
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Step 1: write the equilibrium as a variational inequality}
-Collect both strategies and both vectors of information-set values in one unknown $z = (x, y, p, q)$. An
-equilibrium is a point that satisfies the optimality conditions of both players' linear programs.
+\begin{frame}{The equilibrium as a skew-symmetric variational inequality}
+Let $z = (x, y, p, q)$ collect both realization plans and both vectors of information-set values. Equilibria are
+exactly the solutions of the optimality conditions of both linear programs:
 \[
 \begin{aligned}
  0\le x \ &\perp\ E^\top p - A y \ \ge 0, & Ex &= e,\\
  0\le y \ &\perp\ A^\top x - F^\top q \ \ge 0, & Fy &= f.
 \end{aligned}
 \]
-These conditions have the form $w = Mz + b$ with a matrix that is \textbf{skew-symmetric}.
+These conditions have the form $w = Mz + b$ with a \textbf{skew-symmetric} matrix:
 \[ M = \begin{pmatrix} 0 & -A & E^\top & 0\\ A^\top & 0 & 0 & -F^\top\\ -E & 0 & 0 & 0\\ 0 & F & 0 & 0\end{pmatrix},
    \qquad M + M^\top = 0 . \]
-Skew symmetry makes the problem monotone. It also means that the solutions form a polyhedron and
-not a single point, so Newton's method cannot be applied directly. CFR gives a starting point for all of $z$ for free.
+The problem is therefore monotone, but its solution set is a polyhedron rather than a point, so Newton's method does
+not apply directly. CFR provides an initial point for all of $z$.
 \note{
 This is a mixed linear complementarity problem. The reduced cost $E^\top p - Ay$ of a sequence is its counterfactual
 regret scaled by reach, and complementarity says ``play only actions with zero regret''. So CFR and this system talk
@@ -575,25 +554,24 @@ The details are in \texttt{talk-detailed.pdf}.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Step 2: the proximal point method makes each problem well posed}
-We add a small multiple of the identity. Given $z^k$, the next iterate $z^{k+1}$ solves the same conditions with
+\begin{frame}{Proximal point regularization}
+Given $z^k$, the iterate $z^{k+1}$ solves the same conditions with
 \[ w_\rho(z) = (M + \rho I)\,z + b - \rho\, z^{k} . \]
 \begin{columns}[T]
 \column{0.56\textwidth}
-Since $d^\top(M+\rho I)d = \rho\|d\|^2$, the matrix $M+\rho I$ is positive definite and each regularised problem
-has exactly one solution.
+Since $d^\top(M+\rho I)d = \rho\|d\|^2$, each subproblem is strongly monotone and has a unique solution.
 
 \medskip
-\textbf{Theorem (Rockafellar 1976, Luque 1984).} The iterates converge to a solution of the original problem for every
-$\rho>0$. For a polyhedral problem the rate is linear, with a factor that tends to zero with $\rho$.
+\textbf{Theorem (Rockafellar 1976, Luque 1984).} The iterates converge for every $\rho>0$. For polyhedral problems the
+convergence is linear, with a rate that tends to zero as $\rho \to 0$.
 
 \medskip
-A small $\rho$ gives a fast outer loop and badly conditioned inner problems.
+Small $\rho$ gives fast outer convergence and ill-conditioned subproblems.
 \column{0.41\textwidth}
-\begin{block}{Our computation on Leduc with $\rho = 10^{-5}$}
-\small The residual after each outer step:\\[2pt]
+\begin{block}{Leduc, $\rho = 10^{-5}$}
+\small Residual after each outer step:\\[2pt]
 $3.4\!\times\!10^{-2} \to 4.8\!\times\!10^{-6} \to 3.3\!\times\!10^{-9}$\\ $\to 6.9\!\times\!10^{-12} \to 2.0\!\times\!10^{-14}$\\[3pt]
-About three digits for each step.
+About three digits per step.
 \end{block}
 \end{columns}
 \note{
@@ -606,19 +584,18 @@ nearly as ill posed as the original one, since $\|(M+\rho I)^{-1}\|\le 1/\rho$. 
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Step 3: Newton's method on a piecewise-linear equation}
-Each regularised problem can be written as one equation. For every action, either its probability is zero or its
-reduced cost is zero, and that is the same as $\min\big(x_i,\ w_\rho(z)_i\big)=0$.
+\begin{frame}{Semismooth Newton and the primal-dual active-set method}
+Complementarity is equivalent to the piecewise-linear equation $\min\big(x_i,\ w_\rho(z)_i\big)=0$.
 
 \medskip
-A Newton step for this equation guesses which actions are dropped, imposes indifference on all the others, and solves
-one linear system. Its matrix has the form $V = D_a + D_b(M+\rho I)$ with nonnegative diagonal matrices $D_a$ and $D_b$.
+A semismooth Newton step fixes a guessed active set (the dropped actions), imposes indifference on the remaining actions
+and solves one linear system with matrix $V = D_a + D_b(M+\rho I)$, where $D_a, D_b \ge 0$ are diagonal.
 \begin{block}{Lemma. Every such $V$ with $D_a+D_b$ positive definite is nonsingular.}
 \small Suppose $Vd=0$ and put $u = (M+\rho I)d$. Row $i$ reads $(D_a)_{ii}d_i + (D_b)_{ii}u_i = 0$ with nonnegative coefficients
 that are not both zero, so $d_i u_i \le 0$. Hence $\rho\|d\|^2 = d^\top u = \sum_i d_i u_i \le 0$, and $d=0$. \hfill$\square$
 \end{block}
-If the guess of the dropped actions is right, a single step gives the \emph{exact} solution. If it is wrong there is no
-global guarantee, so the method needs a good starting guess.
+A correct active set gives the \emph{exact} solution in one step. Convergence is only local, so a good initial guess is
+required.
 \note{
 The min-function turns complementarity into a piecewise-linear equation. Semismooth Newton on it is exactly the
 primal-dual active-set method (Hinterm\"uller, Ito and Kunisch 2002). The lemma is the reason
@@ -631,19 +608,19 @@ took steps of size $10^{-3}$ for dozens of iterations. That pushed us to the int
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Step 4: making it robust and fast}
+\begin{frame}{Interior-point crossover and quasi-definite factorization}
 \begin{columns}[T]
 \column{0.55\textwidth}
-\textbf{A robust start.} The first regularised problem is the hardest. We solve it with an interior-point method
-started at the CFR point. Its solution tells us which actions are dropped, and from there the Newton steps land
-exactly on the solution. Every later problem needs only one to three linear solves.
+\textbf{Initialization.} The first subproblem is solved by a Mehrotra interior-point method from the CFR point. Its
+solution predicts the active set, and active-set steps then terminate exactly (crossover). Later subproblems need one to
+three linear solves.
 
 \medskip
-\textbf{Fast linear algebra.} After a change of signs in half of the rows, every linear system is symmetric and
-\emph{quasi-definite}. By a theorem of Vanderbei, such a matrix has an $LDL^\top$ factorisation for every ordering of
-the unknowns, so we can order for sparsity alone and never pivot.
+\textbf{Linear algebra.} After sign changes in two row blocks every system is symmetric \emph{quasi-definite}. By
+Vanderbei's theorem an $LDL^\top$ factorization exists for every symmetric ordering, so a fill-reducing ordering can be
+fixed in advance.
 \column{0.42\textwidth}
-\begin{block}{One factorisation, in seconds}
+\begin{block}{One factorization, in seconds}
 \footnotesize
 \begin{tabular}{@{}l@{\ \ }c@{\ \ }c@{}}
 & small river & our river\\ \midrule
@@ -652,8 +629,8 @@ quasi-definite $LDL^\top$ & 0.04 & 7.6
 \end{tabular}
 \end{block}
 \vspace{4pt}
-{\small The whole solve from the CFR point to a residual of $10^{-13}$ takes \LeducSolves\ linear solves on Leduc and
-\SmallSolves\ on the small river.}
+{\small A residual of $10^{-13}$ from the CFR point requires \LeducSolves\ linear solves on Leduc and \SmallSolves\ on
+the small river.}
 \end{columns}
 \note{
 The first problem is the hardest because many actions enter or leave the support. The division of labour mirrors what commercial LP solvers do, interior point and then crossover to a vertex, but inside a proximal
@@ -668,31 +645,30 @@ pivoted sparse LU, which is cheap because the active-set system lives on the sup
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Step 5: restrict to the support, solve exactly, then verify}
+\begin{frame}{Support restriction and best-response verification}
 \begin{columns}[T]
 \column{0.54\textwidth}
-On larger hands the method so far fails. Many actions are never played and many positions are never
-reached, and in those directions the set of equilibria is \emph{flat}. A point with a tiny residual can be far
-from a solution, and the Newton step guesses the wrong dropped actions.
+On larger instances the solution set is \emph{flat} along unplayed actions and unreached information sets. A small
+residual then does not imply a small error, and the predicted active set is wrong.
 
 \medskip
-The cure is to remove those directions. We keep only the actions that DCFR plays with probability above $10^{-3}$ and
-solve this smaller problem exactly.
+We restrict the problem to the actions that DCFR plays with probability at least $10^{-3}$ and solve the restricted
+problem exactly.
 
 \medskip
-Then we check the answer in the full game. If a removed action would have been profitable we put it back and solve again.
+Pruned actions with positive counterfactual regret in the full game are restored, and the process repeats.
 \column{0.43\textwidth}
-\begin{block}{The complete method}
+\begin{block}{Algorithm}
 \small
 \begin{enumerate}\setlength\itemsep{2pt}
-\item DCFR for a few thousand iterations
-\item keep the actions that it uses
-\item solve the restricted problem to machine precision
-\item compute exact best responses in the full game
-\item add back any profitable action and return to 3
+\item Run DCFR for a few thousand iterations.
+\item Restrict to its support.
+\item Solve the restricted problem to machine precision.
+\item Compute exact best responses in the full game.
+\item Restore profitable actions and return to 3.
 \end{enumerate}
 \end{block}
-{\small Step 4 is a certificate. The final exploitability is measured in the full game and not assumed.}
+{\small Step 4 certifies the final exploitability in the full game.}
 \end{columns}
 \note{
 The verification loop is column generation, the same idea as the double-oracle algorithms for games (McMahan, Gordon and Blum 2003,
@@ -707,19 +683,19 @@ problem had about 35\% of the unknowns of the full one.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Result on the benchmark game, Leduc hold'em}
+\begin{frame}{Results: Leduc hold'em}
 \begin{columns}[c]
 \column{0.6\textwidth}
 \includegraphics[width=\linewidth]{hybrid_leduc.pdf}
 \column{0.38\textwidth}
-Each pink curve starts where a short DCFR run stopped and drops straight down to machine precision.
+Each pink curve starts from a DCFR warm start.
 
 \medskip
-From \SuppLeducWarm\ DCFR iterations our method reaches $\SuppLeducExpl$ in \alert{\SuppLeducTime\
-seconds}. CFR$^+$ is at $\LeducCFRplusLong$ after \LeducCFRplusLongTime\ seconds.
+From \SuppLeducWarm\ DCFR iterations the method reaches $\SuppLeducExpl$ in \alert{\SuppLeducTime\ seconds}. CFR$^+$
+reaches $\LeducCFRplusLong$ after \LeducCFRplusLongTime\ seconds.
 
 \medskip
-Leduc is tiny and an LP solver needs 0.04 seconds. What matters is the shape of the curves.
+HiGHS solves Leduc in 0.04 seconds, so the relevant comparison is the convergence profile.
 \end{columns}
 \note{
 Each pink curve starts where the DCFR warm start stopped, after 100, 300 or 1000 iterations. The points are verification rounds.
@@ -731,22 +707,21 @@ the LP does not fit, which is the next slide.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Result on the river from the demonstration}
+\begin{frame}{Results: river subgame with 473 and 328 hands}
 \begin{columns}[T]
 \column{0.52\textwidth}
 \includegraphics[width=\linewidth]{hybrid_medium.pdf}\\
-{\scriptsize 473 against 328 hands and 17{,}626 unknowns. The points are verification rounds.}
+{\scriptsize 17{,}626 unknowns. Points mark verification rounds.}
 \column{0.46\textwidth}
-Our method runs DCFR for \SuppMedWarm\ iterations and then needs \SuppMedRounds\ rounds on a problem with \SuppMedFrac\%
-of the unknowns. It reaches \alert{$\SuppMedExpl$ chips in \SuppMedTime\ seconds}.
+After \SuppMedWarm\ DCFR iterations, \SuppMedRounds\ rounds on \SuppMedFrac\% of the unknowns reach
+\alert{$\SuppMedExpl$ chips in \SuppMedTime\ seconds}.
 
 \medskip
-At that moment DCFR alone is at $\MedDCFRAtSuppTime$, and after \MedDCFRLongTwoIters\ iterations and \MedDCFRLongTwoTime\
-seconds it is at $\MedDCFRLongTwoExpl$.
+DCFR alone reaches $\MedDCFRAtSuppTime$ in the same time, and $\MedDCFRLongTwoExpl$ after \MedDCFRLongTwoIters\
+iterations (\MedDCFRLongTwoTime\ seconds).
 
 \medskip
-Without the restriction to the support the Newton finish \emph{loses} to DCFR on this hand. The LP solver did not finish in 25
-minutes.
+Without support restriction the Newton refinement is slower than DCFR. HiGHS did not terminate within 25 minutes.
 \end{columns}
 \note{
 This is the slide that took the longest to earn. The first version of the method, Newton on the full sequence-form problem, worked
@@ -761,21 +736,19 @@ On the small river (147 against 139 hands) the method reaches $\SuppSmallExpl$ i
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Where it stops winning, and what is open}
-\begin{block}{Full ranges: all 1{,}081 hands for both players, 47{,}568 unknowns}
-\small The restricted problem still has 43\% of the unknowns and one factorisation takes about 10 seconds. After 80 minutes our
-method is at $4.1\times10^{-6}$ chips. DCFR reaches $9.5\times10^{-6}$ in 10 minutes. \textbf{Here CFR wins.}
+\begin{frame}{Limitations and open problems}
+\begin{block}{Full ranges: 1{,}081 hands per player, 47{,}568 unknowns}
+\small The restricted problem retains 43\% of the unknowns, and one factorization takes about 10 seconds. After 80 minutes
+the method reaches $4.1\times10^{-6}$ chips, and DCFR reaches $9.5\times10^{-6}$ in 10 minutes. \textbf{CFR is faster.}
 \end{block}
 
 \medskip
-The bottleneck is the linear algebra. Each payoff block is dense, but it is a sorted sign matrix plus a sparse correction,
-and a product with it costs $O(n\log n)$. A Newton--Krylov step would then cost only a few CFR iterations, provided we can
-find a good preconditioner for systems of the form ``diagonal plus skew''. We think this is the most promising open problem,
-and it is a problem in numerical linear algebra.
+The bottleneck is factorization. Each payoff block is a sorted sign matrix with a sparse correction and admits
+$O(n\log n)$ products. A Newton--Krylov method therefore needs a preconditioner for shifted skew systems
+$(D + M + \rho I)\,d = r$.
 
 \medskip
-Two further directions are a better prediction of the support from the CFR regrets, which would save verification rounds,
-and the use of exact solves inside programs that play in real time.
+Further directions are support prediction from CFR regrets and exact re-solving in real-time agents.
 \note{
 The run with full ranges is the honest boundary of the method as implemented. The restriction still removes more than half of the
 unknowns, but each factorisation of the remaining system with 20{,}000 unknowns takes about 10 seconds because the payoff blocks between
@@ -789,21 +762,21 @@ solver for the Newton systems would need. Hierarchical factorisations of the blo
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{What is new here, and what is not}
-The ingredients are classical: the sequence form, the proximal point method, semismooth Newton,
-interior point with crossover, quasi-definite factorisations and the CFR family.
+\begin{frame}{Contributions and related work}
+The components are classical: the sequence form, the proximal point method, semismooth Newton, interior point with
+crossover, quasi-definite factorization and CFR.
 
 \medskip
-The closest work is by Yang, Gao, Lin and Kroer (2025), who use a semismooth Newton method for \emph{matrix} games after a
-first-order warm start.
+The closest work is Yang, Gao, Lin and Kroer (2025), a semismooth Newton method for \emph{matrix} games with a first-order
+warm start.
 
 \medskip
-What we add is a second-order finish that works directly on the sequence form of a poker game. It has four parts:
+Our contributions for extensive-form games:
 \begin{itemize}\setlength\itemsep{0pt}
-\item the skew formulation with a proximal term, which gives nonsingular Newton matrices by a one-line proof,
-\item a warm start for both the strategies and the values taken from CFR,
-\item the restriction to the support predicted by CFR, which removes the flat directions,
-\item and the verification by exact best responses in the full game.
+\item a skew variational inequality on the sequence form, with proximal regularization and a nonsingularity lemma,
+\item a primal and dual warm start from CFR,
+\item restriction to the support predicted by CFR,
+\item certification by best responses in the full game.
 \end{itemize}
 \note{
 Be precise about novelty. The general idea of a first-order warm start followed by semismooth Newton for zero-sum games was proposed
@@ -815,25 +788,22 @@ To our knowledge no solver based on CFR hands over to a second-order method for 
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Takeaways}
-A poker equilibrium is the solution of a structured saddle-point problem, and the sequence form turns it into a linear program
-whose size is linear in the game tree.
+\begin{frame}{Conclusions}
+The sequence form reduces equilibrium computation to a linear program of size linear in the game tree.
 
 \medskip
-CFR is regret matching at every information set. It never forms the matrix, its proven rate is $T^{-1/2}$, and its modern
-variants are much faster in practice, as the race in the browser showed.
+CFR is regret matching at every information set. It is matrix-free, converges at rate $O(T^{-1/2})$ in theory, and is
+much faster in practice.
 
 \medskip
-The output is readable poker: value bets, bluffs, traps and a defence that follows the pot odds.
+The computed strategies exhibit polarization, slow play and defence consistent with the MDF.
 
 \medskip
-Read as a skew variational inequality, the same problem can be finished by a proximal Newton method. The obstacle is the
-flatness of the equilibrium set, and restricting to the support that CFR predicts removes it. On our river this gives
-an exploitability of $10^{-12}$ in about two minutes, where DCFR alone is at $10^{-6}$. With full ranges the linear algebra becomes the
-bottleneck and CFR wins again.
+A support-restricted proximal Newton method reaches an exploitability of $10^{-12}$ in about two minutes on a river with
+17{,}626 unknowns, where DCFR reaches $10^{-6}$. On full ranges the factorization cost favours CFR.
 
 \medskip
-{\small The solver, the interactive page, the benchmarks and these slides are at \texttt{github.com/dwangnumbers/Poker-Solver}.}
+{\small Code, benchmarks and the interactive solver: \texttt{github.com/dwangnumbers/Poker-Solver}.}
 \note{
 End with the invitation. The open problem on the earlier slide is a natural one for this club: a preconditioner for
 shifted skew systems whose off-diagonal blocks are a sorted sign matrix plus a sparse correction.\\[3pt]
@@ -842,7 +812,7 @@ If there is time left, go back to the browser and take requests: another board, 
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Main references}
+\begin{frame}{References}
 \footnotesize
 \begin{itemize}\setlength\itemsep{1pt}
 \item D.~Koller, N.~Megiddo, B.~von Stengel. Efficient computation of equilibria for extensive two-person games. \emph{Games Econ.\ Behav.} 14 (1996).
@@ -858,22 +828,22 @@ The complete list of references is in \texttt{talk-detailed.pdf}.
 
 % =====================================================================================
 \appendix
-\begin{frame}{Backup: Kuhn poker, where the equilibrium is not unique}
+\begin{frame}{Appendix: non-uniqueness in Kuhn poker}
 \begin{columns}[T]
 \column{0.55\textwidth}
-Kuhn poker uses the three cards \pcard[0.8]{J}{s}\,\pcard[0.8]{Q}{s}\,\pcard[0.8]{K}{s}. Each player puts in one chip and gets one card, and
-there is a single bet of one chip.
+Kuhn poker uses three cards, \pcard[0.8]{J}{s}\,\pcard[0.8]{Q}{s}\,\pcard[0.8]{K}{s}, an ante of one chip and a single
+bet of one chip.
 
 \medskip
-Its equilibria form a one-parameter family. The first player bets the jack as a bluff with any probability
-$\alpha$ between 0 and $\tfrac13$, and bets the king with probability $3\alpha$. The value of the game is $-\tfrac1{18}$.
+Its equilibria form a one-parameter family. Player 1 bluffs the jack with probability $\alpha \in [0, \tfrac13]$ and
+bets the king with probability $3\alpha$. The value is $-\tfrac1{18}$.
 
 \medskip
-The set of equilibria is a polytope and not a point, and any method has to cope with that.
+The solution set is a segment, not a point.
 \column{0.42\textwidth}
-\begin{block}{Our computation}
+\begin{block}{Computed}
 \small
-The Newton finish returns $\alpha = 0.198$ and bets the king with probability $0.593 = 3\alpha$.\\[2pt]
+$\alpha = 0.198$, and the king is bet with probability $0.593 = 3\alpha$.\\[2pt]
 Value $-0.0555\ldots = -1/18$.\\[2pt]
 Exploitability $1.1\times10^{-16}$.
 \end{block}
@@ -882,24 +852,24 @@ Exploitability $1.1\times10^{-16}$.
 singular, and the proximal term picks one member of the family.}
 \end{frame}
 
-\begin{frame}{Backup: the first-order methods on Leduc hold'em}
+\begin{frame}{Appendix: first-order convergence on Leduc hold'em}
 \begin{columns}[c]
 \column{0.58\textwidth}
 \includegraphics[width=\linewidth]{conv_leduc_iters.pdf}
 \column{0.4\textwidth}
-The curves show the exploitability of the average strategy for our implementation.
+Exploitability of the average strategy.
 
 \medskip
-After 5{,}000 iterations and \LeducDCFRfiveTime\ seconds DCFR reaches $\LeducDCFRfive$. After 50{,}000 iterations and
-\LeducCFRplusLongTime\ seconds CFR$^+$ reaches $\LeducCFRplusLong$ and DCFR $\LeducDCFRLong$.
+DCFR reaches $\LeducDCFRfive$ after 5{,}000 iterations (\LeducDCFRfiveTime\ seconds). After 50{,}000 iterations
+(\LeducCFRplusLongTime\ seconds) CFR$^+$ reaches $\LeducCFRplusLong$ and DCFR $\LeducDCFRLong$.
 
 \medskip
-Each extra digit costs about ten times more iterations.
+Each additional digit costs about ten times more iterations.
 \end{columns}
 \note{Exploitability is in chips per hand, and the antes in Leduc are 1 chip.}
 \end{frame}
 
-\begin{frame}{Backup: a small river, and every linear solve of one exact solve}
+\begin{frame}{Appendix: small river and inner iteration history}
 \begin{columns}[c]
 \column{0.5\textwidth}
 \includegraphics[width=\linewidth]{hybrid_small.pdf}
@@ -907,26 +877,26 @@ Each extra digit costs about ten times more iterations.
 \includegraphics[width=\linewidth]{newton_inner.pdf}
 \end{columns}
 \medskip
-\small On the left is a river with 147 against 139 hands. Our method reaches $\SuppSmallExpl$ chips in \SuppSmallTime\ seconds, DCFR is at
-$\SmallDCFRExpl$ after \SmallDCFRTime\ seconds, and the LP takes 1.6 seconds. On the right is the residual after every linear solve. The blue
-points are interior-point iterations and the pink points are Newton steps.
+\small Left: river with 147 and 139 hands. The method reaches $\SuppSmallExpl$ chips in \SuppSmallTime\ seconds, DCFR
+reaches $\SmallDCFRExpl$ after \SmallDCFRTime\ seconds, and HiGHS needs 1.6 seconds. Right: residual after each linear
+solve. Blue points are interior-point iterations and pink points are Newton steps.
 \note{The crossover lands on the exact solution of the first regularised
 subproblem, whose residual is $\rho\|z^1-z^0\|$, hence the jump. After that each proximal step is solved exactly in one to three steps.}
 \end{frame}
 
-\begin{frame}{Backup: the rate of the proximal point method, and why flat equilibria hurt}
-The proximal step is the resolvent of a maximal monotone operator $T$, so the iterates move monotonically towards the solution set $Z$.
+\begin{frame}{Appendix: proximal point rate and flat solution sets}
+The proximal step is the resolvent of a maximal monotone operator $T$, and the iterates are Fej\'er monotone with
+respect to the solution set $Z$.
 
 \medskip
 If $T^{-1}$ is upper Lipschitz at $0$ with modulus $a$, which holds for polyhedral problems, then
 \[ \operatorname{dist}(z^{k+1}, Z) \ \le\ \frac{a\rho}{\sqrt{1 + a^2\rho^2}}\ \operatorname{dist}(z^k, Z). \]
-The modulus $a$ measures how far a point with a small residual can be from $Z$. It is large when the equilibrium set is flat,
-that is, when many hands have actions that barely matter.
+The modulus $a$ bounds the distance to $Z$ in terms of the residual. It is large when the solution set is flat.
 
 \medskip
-A fast outer loop needs $\rho$ much smaller than $1/a$. But $\|(M+\rho I)^{-1}\|\approx 1/\rho$ then makes the active set of each
-subproblem fragile. On Leduc we observe a factor of about $10^{-3}$ for each step at $\rho=10^{-5}$. On the full river of the demonstration no
-value of $\rho$ gave both, and the restriction to the support removes the flat directions instead.
+Fast outer convergence requires $\rho \ll 1/a$, but $\|(M+\rho I)^{-1}\|\approx 1/\rho$ makes the active set of each
+subproblem sensitive. On Leduc the observed factor is about $10^{-3}$ per step at $\rho=10^{-5}$. On the large river no
+single $\rho$ achieved both, and support restriction removes the flat directions instead.
 \note{Backup for questions about the outer loop. Rockafellar 1976, Luque 1984, Robinson 1981.}
 \end{frame}
 
