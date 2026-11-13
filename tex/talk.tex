@@ -350,28 +350,29 @@ At 1081 hands the sweep is several hundred times faster than the direct sum and 
 % =====================================================================================
 \begin{frame}{A cost model for one iteration}
 \begin{columns}[T]
-\column{0.47\textwidth}
-The work of one iteration is a sum of four counts, each in units of hands:
+\column{0.5\textwidth}
+The time of one iteration is modelled by four work counts:
 \[ T \approx a\,W_{\mathrm{dec}} + b\,W_{\mathrm{show}} + c\,W_{\mathrm{fold}} + d\,W_{\mathrm{chance}}, \]
-with $W_{\mathrm{dec}}=\sum n_p|A|$ over decisions and the other counts summing $n$ over leaves and $Kn$ over chance
-nodes. A nonnegative least-squares fit over \CostTrees\ trees gives, in nanoseconds,
+where $W_{\mathrm{dec}}=\sum n_p|A|$ over decisions, and the other counts sum $n$ over leaves and $Kn$ over chance
+nodes. The leaf constants come from the leaf benchmark; $a$ and $d$ are fitted by nonnegative least squares over
+\CostTrees\ trees. In nanoseconds,
 \[ a = \CostA,\quad b = \CostB,\quad c = \CostC,\quad d = \CostD , \]
-with the largest relative residual \CostResid.
-\column{0.51\textwidth}
+and every measured time is within \CostResid\ of the model.
+\column{0.48\textwidth}
 \centering
 {\footnotesize\setlength\tabcolsep{3pt}\input{data/cost_table.tex}}\\[3pt]
-{\scriptsize Milliseconds per iteration on one core, measured and fitted.}
+{\scriptsize Milliseconds per iteration on one core, measured and modelled, for trees that take at least 5 ms.}
 \end{columns}
 \note{
-The decision constant $a$ is the cost per regret entry and iteration over both traversals. For comparison, the same JavaScript runtime
-runs the bare DCFR update loop at \RoofUpdNs\ ns per entry and a float32 copy at \RoofCopyGBs\ GB/s, so the solver is about
-\RoofRatio\ times slower than the bare update. The gap is the traversal overhead (regret matching, reach products, recursion), not
-memory bandwidth.\\[3pt]
+Fitting all four constants at once is ill-posed: the fold work is nearly proportional to the decision work in every tree, so the
+columns are almost collinear. Fixing the leaf constants from the separate benchmark removes the collinearity.\\[3pt]
+On the flop tree the leaves take about \FlopLeafShare\ of the time and the decisions most of the rest. For comparison, the same JavaScript
+runtime runs the bare DCFR update loop at \RoofUpdNs\ ns per entry and copies float32 arrays at \RoofCopyGBs\ GB/s, so $a$ is about
+\RoofRatio\ times the bare update. The gap is traversal overhead (regret matching, reach products, recursion), not memory bandwidth.\\[3pt]
 Adding a bet size multiplies the tree, because it adds a branch at every node of the street and a copy of all later streets below it.
 }
 \end{frame}
 
-% =====================================================================================
 \begin{frame}{Memory}
 \begin{columns}[T]
 \column{0.5\textwidth}
@@ -409,7 +410,7 @@ relative size about $3/t$, so it is resolved while $3/t\gg u$, that is for $t\ll
 
 \medskip
 All four combinations of single and double precision for $R$ and $S$ reach the same exploitability, down to
-\PrecFloor\% of the pot. The reach-weighted strategy difference is \PrecDiff.
+\PrecFloor\% of the pot. The reach-weighted mean $L^1$ distance between the strategies is \PrecDiff.
 \column{0.5\textwidth}
 \centering
 \includegraphics[width=\linewidth]{precision.pdf}\\
@@ -420,7 +421,9 @@ turn spot (dashed).}
 The strategy is a ratio of sums, so relative errors of the sums enter the strategy as relative errors of size $u$ per update. A term is
 lost only when its relative size falls below $u$, which needs about $10^7$ iterations.\\[3pt]
 The regrets grow like $\sqrt t$ and are resolved for longer. Rounding differences are amplified by the iteration, so the curves are
-not identical, but the differences are of both signs and much smaller than the exploitability itself.\\[3pt]
+not identical, but they cross repeatedly and differ by much less than the exploitability itself. An earlier version of the
+solver seemed to show a single-precision floor near $10^{-3}$\% of the pot; it disappeared with the exact zero-reach handling of the DCFR
+slide, so it was an artefact of the iteration, not of rounding.\\[3pt]
 Half the memory for the same result. This is why commercial solvers can go further and compress to 16-bit integers.
 }
 \end{frame}
@@ -441,17 +444,18 @@ $\lceil K/P\rceil$, the model is $T(P) \approx t_c + \lceil K/P\rceil\, t_1$.
 \column{0.45\textwidth}
 \centering
 {\footnotesize\setlength\tabcolsep{3pt}\input{data/parallel_table.tex}}\\[4pt]
-{\scriptsize Milliseconds per iteration on the \ParCores-core test machine; the model is calibrated on $P=1$. The
-results agree with the sequential solver to \ParAgree\ in relative terms.}
+{\scriptsize Milliseconds per iteration in Chrome with Web Workers on the \ParCores-core test machine; the model is
+calibrated on $P=1$. Exploitabilities agree with the sequential solver to \ParAgree\ in relative terms.}
 \end{columns}
 \note{
 This is a domain decomposition of the tree with the first-level chance nodes as interface. The messages are two vectors of length $n$
-per chance node and worker, \ParBytes\ per traversal, against millions of operations per card. The coordinator's share is under a
+per chance node and worker, at most \ParBytes\ per traversal, against millions of operations per card. The coordinator's share is under a
 millisecond.\\[3pt]
-The results differ from the sequential solver only in the order in which the chance sums are added, at the level of $10^{-14}$; they
-are not bitwise identical. The speedup is limited by load balance among the cards: with 49 turn cards and two workers one worker has 25.
-Measurements on more cores are a next step; the model predicts $\ParPredEight$ ms with eight workers on the flop.\\[3pt]
-In the browser the workers are Web Workers and the coordinator is the main thread. Games without a chance node, river spots, run in one worker.
+The results differ from the sequential solver only in the order in which the chance sums are added; they are not bitwise identical.
+On the flop, two workers reach \ParEff\ of the model's prediction. The model ignores message latency and the competition of the two
+workers for memory bandwidth and cache, and the main thread also runs the page. The model predicts \ParPredEight\ ms with eight workers. On the turn the passes are short, so the latency matters more.\\[3pt]
+In Node's worker threads the same partitioned traversal runs about \ParNodeOverhead\ slower than on the main thread for reasons we have
+not identified; in Chrome the overhead with one worker is about 2\%. In the browser the workers are Web Workers and the coordinator is the main thread. Games without a chance node, river spots, run in one worker.
 }
 \end{frame}
 
@@ -471,20 +475,14 @@ three. Explaining why the modern variants do so much better on poker trees is an
 
 % =====================================================================================
 \begin{frame}{Iterations to a fixed accuracy}
-\begin{columns}[T]
-\column{0.5\textwidth}
-DCFR on five river, five turn and three flop spots, with one tree per street and the boards listed in the notes.
-
-\medskip
-\centering
-{\footnotesize\setlength\tabcolsep{4pt}\input{data/tol_table.tex}}\\[3pt]
-{\scriptsize Median and range of the iterations to reach each accuracy, in percent of the pot.}
-\column{0.48\textwidth}
-\raggedright
-The iterations needed for a practical accuracy vary by a factor of a few between spots and do not grow with the size of
+DCFR on five river, five turn and three flop spots, with one tree per street. The table gives the median and the range of
+the iterations needed to reach each accuracy, in percent of the pot.
+\begin{center}
+{\small\setlength\tabcolsep{8pt}\input{data/tol_table.tex}}
+\end{center}
+The iterations for a practical accuracy vary by less than a factor of two between spots and do not grow with the size of
 the tree. The running time to a fixed accuracy is therefore governed by the cost per iteration, which grows by three
 orders of magnitude from the river to the flop.
-\end{columns}
 \note{
 Boards: river K72T4, A8492 two-tone, T9832, QJ552, 762KA; the turn spots are the first four cards of the same boards; flop spots K72
 rainbow, T98 two-tone and A84 two-tone. Ranges are the big blind's call and the button's open.\\[3pt]

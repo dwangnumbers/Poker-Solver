@@ -111,14 +111,13 @@ if sc:
     table("size_table", ["street", "decision nodes", "hands"], rows, "lrr")
 
 # ---- memory by tree (flop K72) from the estimator
-mem = [("--- / 33", "75 / 75", "75 / 75", 431), ("x/r 50 / 33", "75 / 75", "75 / 75", 647), ("x/r 50 / 33", "-- / 75", "75 / 75, all-in", 755),
-       ("x/r 50 / 33", "66 / 66, r 50", "75 / 75, all-in", 1457), ("x/r 50 / 33, 75", "-- / 75, r 50", "75, all-in", 1681),
-       ("x/r 60 / 33", "75, r 60", "75, r 60, all-in", 3614)]
-table("mem_table", ["flop", "turn", "river", "MB"], [[a.replace("--", "--"), b, c, f"{m:,}"] for a, b, c, m in mem], "lllr")
+me = load("memest")
+if me:
+    table("mem_table", ["flop", "turn", "river", "MB"], [[r["flop"], r["turn"], r["river"], f"{r['MB']:,.0f}"] for r in me], "lllr")
 
 # ---- precision
 pr = load("precision")
-if pr:
+if pr and "float32" in next(iter(pr.values())):
     fig, ax = plt.subplots(figsize=(3.6, 2.6))
     for name, d in pr.items():
         ls = "-" if "small" in name else "--"
@@ -236,35 +235,41 @@ if rows:
     table("tol_table", ["street", "spots", "1\\%", "0.3\\%", "0.1\\%"], rows, "lrrrr")
 if cs["flop"]:
     d = cs["flop"][0]
-    mac("FlopInfosets", "$" + sci(d["decisions"] * (d["n"][0] + d["n"][1]) / 2, 1) + "$")
+    mac("FlopInfosets", sci(d["decisions"] * (d["n"][0] + d["n"][1]) / 2, 1))
 
-# cost model
+# cost model: leaf constants from the micro-benchmark (two traversals per iteration), decision and chance constants
+# fitted by nonnegative least squares on relative residuals, over trees that take at least 5 ms per iteration
 sc = load("scaling")
-if sc and "foldWork" in sc[0]:
+lcb = load("leafcost")
+if sc and "foldWork" in sc[0] and lcb:
     from scipy.optimize import nnls
-    X = np.array([[r["work"], r["showWork"], r["foldWork"], r["chanceWork"]] for r in sc], float)
-    y = np.array([r["msPerIter"] for r in sc], float)
-    w = 1 / y                                      # relative residuals
+    big = max(lcb, key=lambda r: r["n"])
+    b_ = 2e-3 * big["sweep_us"] / big["n"]          # ms per hand and showdown leaf, per iteration
+    c_ = 2e-3 * big["fold_us"] / big["n"]
+    fit = [r for r in sc if r["msPerIter"] >= 5]
+    X = np.array([[r["work"], r["chanceWork"]] for r in fit], float)
+    y = np.array([r["msPerIter"] - b_ * r["showWork"] - c_ * r["foldWork"] for r in fit], float)
+    w = 1 / np.array([r["msPerIter"] for r in fit])
     coef, _ = nnls(X * w[:, None], y * w)
-    pred = X @ coef
-    rel = np.abs(pred - y) / y
-    for k, c in zip("ABCD", coef):
-        mac("Cost" + k, f"{1e6 * c:.0f}" if 1e6 * c >= 10 else f"{1e6 * c:.1f}")
-    mac("CostTrees", str(len(sc)))
-    mac("CostResid", f"{100 * rel.max():.0f}\\%")
-    rows = [[r["name"], f"{r['decisions']:,}", f"{r['msPerIter']:.1f}" if r["msPerIter"] < 10 else f"{r['msPerIter']:.0f}",
-             f"{pr:.1f}" if pr < 10 else f"{pr:.0f}"] for r, pr in zip(sc, pred)]
+    def model(r):
+        return coef[0] * r["work"] + coef[1] * r["chanceWork"] + b_ * r["showWork"] + c_ * r["foldWork"]
+    rel = np.array([abs(model(r) - r["msPerIter"]) / r["msPerIter"] for r in fit])
+    mac("CostA", f"{1e6 * coef[0]:.1f}"); mac("CostB", f"{1e6 * b_:.0f}"); mac("CostC", f"{1e6 * c_:.0f}"); mac("CostD", f"{1e6 * coef[1]:.1f}")
+    mac("CostTrees", str(len(fit))); mac("CostResid", f"{100 * rel.max():.0f}\\%")
+    rows = [[r["name"], f"{r['decisions']:,}", f"{r['msPerIter']:.0f}", f"{model(r):.0f}"] for r in fit]
     table("cost_table", ["tree", "decisions", "measured", "model"], rows, "lrrr")
     fl = next((r for r in sc if r["name"] == "flop, 1 size per street"), None)
     if fl:
         mac("FlopShowLeaves", f"{fl['showLeaves']:,}".replace(",", "{,}"))
-    mac("CostAraw", f"{1e6 * coef[0]:.1f}")
+        share = (b_ * fl["showWork"] + c_ * fl["foldWork"]) / fl["msPerIter"]
+        mac("FlopLeafShare", f"{100 * share:.0f}\\%")
+    sc_coef = coef
 rf = load("roofline")
 if rf:
     mac("RoofUpdNs", f"{rf['updateNsPerEntry']:.1f}")
     mac("RoofCopyGBs", f"{rf['copyGBs']:.1f}")
     if sc and "foldWork" in sc[0]:
-        mac("RoofRatio", f"{1e6 * coef[0] / rf['updateNsPerEntry']:.0f}")
+        mac("RoofRatio", f"{1e6 * sc_coef[0] / rf['updateNsPerEntry']:.0f}")
 
 # precision, four combinations
 pr = load("precision")
@@ -287,30 +292,27 @@ if pr and "R32 S32" in next(iter(pr.values())):
     mac("PrecFloor", "$" + sci(min(fin), 0) + "$")
     mac("PrecDiff", "$" + sci(small["weightedStrategyDiff"], 1) + "$" + (" on the small game and $" + sci(pr["turn spot"]["weightedStrategyDiff"], 1) + "$ on the turn spot" if "turn spot" in pr and "weightedStrategyDiff" in pr["turn spot"] else ""))
 
-# parallel with the model
-pa = load("parallel")
-if pa:
+# parallel: measured in Chrome (the site's environment); model T(P) = t_c + ceil(K/P) t_1 calibrated on P = 1
+pb, pa = load("parallel_browser"), load("parallel")
+if pb:
     rows = []
-    for spot in ("turn", "flop"):
-        rs = {r["K"]: r for r in pa["rows"] if r["spot"] == spot}
-        if 1 not in rs:
-            continue
-        K = 48 - (4 if spot == "turn" else 3)          # first-level cards once both hands are known (approximately)
-        Kc = 52 - (4 if spot == "turn" else 3)
-        tc = rs[1]["coordMsPerPass"] * 2
-        t1 = (rs[1]["msPool"] - tc) / Kc
+    for r in pb:
+        Kc = 52 - (4 if r["spot"] == "turn" else 3)
+        tc = 0.5
+        t1 = (r["P1"] - tc) / Kc
         model = lambda P: tc + math.ceil(Kc / P) * t1
-        row = [spot, f"{rs[1]['msSeq']:.0f}", f"{rs[1]['msPool']:.0f}"]
-        if 2 in rs:
-            row += [f"{rs[2]['msPool']:.0f}", f"{model(2):.0f}", f"{rs[1]['msSeq'] / rs[2]['msPool']:.2f}"]
-        rows.append(row)
-        if spot == "flop":
-            mac("ParPredEight", f"{model(8):.0f}")
+        rows.append([r["spot"], f"{r['seq']:.0f}", f"{r['P1']:.0f}", f"{r['P2']:.0f}", f"{model(2):.0f}", f"{r['seq'] / r['P2']:.2f}"])
+        if r["spot"] == "flop":
+            mac("ParPredEight", f"{model(8):.0f}"); mac("ParEff", f"{100 * model(2) / r['P2']:.0f}\\%")
     table("parallel_table", ["spot", "seq.", "$P=1$", "$P=2$", "model", "speedup"], rows, "lrrrrr")
+if pa:
     mac("ParCores", str(pa["cores"]))
     mac("ParBytes", f"{max(r['bytesPerPassPerWorker'] for r in pa['rows']) / 1024:.0f} kB")
     rel = [abs(r["explSeq"] - r["explPool"]) / abs(r["explSeq"]) for r in pa["rows"]]
-    mac("ParAgree", "$" + sci(max(max(rel), 1e-16), 0) + "$" if max(rel) > 0 else "all printed digits")
+    mac("ParAgree", "$" + sci(max(max(rel), 1e-16), 0) + "$")
+    fl = {r["K"]: r for r in pa["rows"] if r["spot"] == "flop"}
+    if 1 in fl:
+        mac("ParNodeOverhead", f"{100 * (fl[1]['msPool'] / fl[1]['msSeq'] - 1):.0f}\\%")
 
 # validation numbers
 ro, tl, fp = load("river_old"), load("turn_lp"), load("flop_lp")
@@ -359,14 +361,14 @@ ps = load("pf_sens")
 if ps:
     mac("SensRms", "$" + sci(ps["rmsTableDiff"], 1) + "$"); mac("SensMax", "$" + sci(ps["maxTableDiff"], 1) + "$")
     rows = [[f"{r['stack']} bb", f"{r['valA']:.5f}", f"{r['valB']:.5f}", f"{abs(r['valA'] - r['valB']):.1e}", f"{100 * abs(r['pushA'] - r['pushB']):.2f}", f"{2 * r['stack'] * ps['maxTableDiff']:.2f}"] for r in ps["rows"]]
-    table("sens_table", ["stack", "value, table 1", "value, table 2", "difference", "push, points", "bound $\\delta$"], rows, "rrrrrr")
+    table("sens_table", ["stack", "value, table 1", "value, table 2", "difference", "push change, points", "bound $\\delta$"], rows, "rrrrrr")
 lr = load("lowrank")
 if lr:
     table("lowrank_table", ["$R$", "slice error", "contraction error"], [[str(r["rank"]), f"${sci(r['sliceError'], 1)}$", f"${sci(r['contractionError'], 1)}$"] for r in lr["rows"] if r["rank"] in (1, 4, 8, 16, 32)], "rrr")
     mac("LowRankErr", "$" + sci(next(r for r in lr["rows"] if r["rank"] == 16)["contractionError"], 1) + "$")
 
 # placeholders for anything still missing, so that the deck compiles
-needed = ["FlopInfosets", "CostA", "CostB", "CostC", "CostD", "CostTrees", "CostResid", "FlopShowLeaves", "RoofUpdNs", "RoofCopyGBs", "RoofRatio",
+needed = ["FlopLeafShare", "ParEff", "ParNodeOverhead", "FlopInfosets", "CostA", "CostB", "CostC", "CostD", "CostTrees", "CostResid", "FlopShowLeaves", "RoofUpdNs", "RoofCopyGBs", "RoofRatio",
           "PrecFloor", "PrecDiff", "ParCores", "ParBytes", "ParAgree", "ParPredEight", "RiverOldNew", "RiverOldOld", "TurnLP", "TurnJS", "TurnHands",
           "FlopLP", "FlopJS", "FlopHands", "LockItBefore", "LockItAfter", "LockValAfter", "LockValBefore", "LockFoldAfter", "LockFoldBefore",
           "LockBetBefore", "SensRms", "SensMax", "LowRankErr", "DDensity", "ConvSlopes", "LeafErr"]

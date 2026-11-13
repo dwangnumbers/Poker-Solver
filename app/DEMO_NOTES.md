@@ -29,7 +29,8 @@ later streets. The memory estimate is computed before building: eight bytes per 
 dashed target line at 0.3% of the pot. Each point is a full best-response computation in both directions.
 
 **The math.** Exploitability is the duality gap of the saddle-point problem. The curve is the convergence slide of
-the talk happening live; DCFR needs a few hundred iterations for 0.3% of the pot.
+the talk happening live. On this spot DCFR reaches 0.3% of the pot in about 70 iterations; across our river, turn and
+flop spots the median is between 70 and 170 iterations.
 
 ## Step 2. Browse the solution (2 minutes)
 
@@ -79,6 +80,10 @@ to the players by deviating, and it decreases but slowly."
 
 **Say.** "Up to suit permutations there are 1,755 different flops. A report solves the same spot on a weighted,
 stratified subset and averages. Each flop takes a few seconds with the later streets checked down."
+
+## Time
+
+The talk budgets nine minutes for the demonstration and five for questions at the end.
 
 ## Five minute version
 
