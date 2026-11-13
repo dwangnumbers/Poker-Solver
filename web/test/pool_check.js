@@ -6,7 +6,10 @@ const E = require('../js/engine.js'), { Pool } = require('../js/pool.js');
     const cfg = { board: board.match(/../g).map(E.cardOf), pot: 10, stack: 40, ranges: [E.parseRange('22+,A2s+,KTs+,QTs+,JTs,ATo+,KJo+'), E.parseRange('55+,A8s+,KQs,AJo+')], tree };
     let t0 = Date.now(); const s = new E.Solver(E.buildGame(cfg)); s.iterate(30); const a = s.evaluate(); const t1 = Date.now() - t0;
     t0 = Date.now(); const P = await Pool.create(cfg, { workers: 3 }); await P.iterate(30); const b = await P.evaluate(); const t2 = Date.now() - t0;
-    const path = board.length === 6 ? [0, 0, 5, 0] : board.length === 8 ? [0, 1, 0] : [1, 0];
+    // a path through the first chance level (if any) to a decision node below it
+    const path = []; let nd = s.g.root, crossed = false;
+    while (nd && nd.t !== 'f' && nd.t !== 's') { if (nd.t === 'c') { const c = nd.cards[3]; path.push(c); nd = nd.ch[c]; crossed = true; } else { if (crossed && path.length > 2) break; const a = nd.na > 1 ? 1 : 0; path.push(a); nd = nd.ch[a]; } }
+    while (path.length && E.nodeAt(s.g, path).t !== 'd') path.pop();
     const x = s.analyse(path), y = await P.analyse(path);
     let d = 0; for (const p of [0, 1]) for (let i = 0; i < x.ev[p].ev.length; i++) if (!isNaN(x.ev[p].ev[i])) d = Math.max(d, Math.abs(x.ev[p].ev[i] - y.ev[p].ev[i]));
     let ds = 0; if (x.strategy) for (let i = 0; i < x.strategy.length; i++) ds = Math.max(ds, Math.abs(x.strategy[i] - y.strategy[i]));

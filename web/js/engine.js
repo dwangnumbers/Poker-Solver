@@ -188,6 +188,13 @@
     }
 
     function build(st, board, c0, c1, toAct, nBets, facing, checked, path) {
+      // a player who can only check has no decision: skip the node
+      let betSizes = null;
+      if (!facing) {
+        const myC0 = toAct === 0 ? c0 : c1, otherC0 = toAct === 0 ? c1 : c0;
+        betSizes = nBets < maxBets && myC0 < S - 1e-9 ? sizesFor(st, toAct, 'bet', potOf(c0, c1), 0, myC0, otherC0) : [];
+        if (!betSizes.length) return toAct === 0 ? build(st, board, c0, c1, 1, nBets, false, true) : endStreet(st, board, c0, c1);
+      }
       g.nodes++;
       const node = { t: 'd', p: toAct, st, board, c: [c0, c1], acts: [], ch: [], R: null, S: null, lock: null, id: g.decisions.length };
       g.decisions.push(node);
@@ -206,8 +213,8 @@
       } else {
         if (me === 0) add('check', myC, build(st, board, c0, c1, 1, nBets, false, true), 'check');
         else add('check', myC, endStreet(st, board, c0, c1), 'check');
-        if (nBets < maxBets && myC < S - 1e-9) {
-          for (const to of sizesFor(st, me, 'bet', potNow, 0, myC, otherC)) {
+        {
+          for (const to of betSizes) {
             const nc = [c0, c1]; nc[me] = to;
             add(to >= S ? 'allin' : 'bet', to, build(st, board, nc[0], nc[1], other, nBets + 1, true, false), (to >= S ? 'all-in ' : 'bet ') + fmt(to - myC));
           }

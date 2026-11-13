@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aggregate flop reports · DCFR poker solver</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/site.css">
+<style>body{margin:0}</style>
+</head>
+<body>
+<div class="top"><div class="top-in"><h1><a href="index.html">DCFR poker solver</a></h1><span class="sub1">Aggregate flop reports</span><nav class="nav" aria-label="Pages"><a href="index.html">Postflop</a><a href="preflop.html">Preflop and multiway</a><a href="reports.html" aria-current="page">Flop reports</a><a href="demo.html">Talk demo</a><a href="methods.html">Methods</a></nav></div></div>
+<div class="wrap">
+  <div class="cols2">
+    <div class="col">
+      <section class="panel">
+        <h2>Spot</h2>
+        <div class="form2">
+          <label class="f">OOP range<select class="inp" id="r0p"></select></label>
+          <label class="f">IP range<select class="inp" id="r1p"></select></label>
+        </div>
+        <div class="rangebox" style="margin-top:6px"><textarea id="r0" spellcheck="false" aria-label="OOP range"></textarea><textarea id="r1" spellcheck="false" aria-label="IP range" style="margin-top:6px"></textarea></div>
+        <div class="form2" style="margin-top:8px">
+          <label class="f">Pot<input id="pot" type="number" min="0.5" step="0.5" value="5.5"></label>
+          <label class="f">Effective stack<input id="stack" type="number" min="0.5" step="0.5" value="97.5"></label>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Tree</h2>
+        <div class="form3">
+          <label class="f">OOP flop bets<input id="fb0" value="33" spellcheck="false"></label>
+          <label class="f">IP flop bets<input id="fb1" value="33,75" spellcheck="false"></label>
+          <label class="f">Flop raises<input id="fr" value="50" spellcheck="false"></label>
+        </div>
+        <label class="f" style="margin-top:8px">Turn and river<select id="later">
+          <option value="none">Checked down: no betting after the flop (fast)</option>
+          <option value="one">One bet size of 75% for both players on each street (slow)</option></select></label>
+        <p class="hint">A report solves every flop of the set with the same ranges and tree and records the strategies at the first two decisions, the values and the equities. Checked-down later streets keep each flop to a few seconds; the full tree gives better strategies but takes minutes per flop.</p>
+      </section>
+      <section class="panel">
+        <h2>Flops and accuracy</h2>
+        <div class="form2">
+          <label class="f">Flop set<select id="subset"><option value="25">25 flops, weighted</option><option value="49" selected>49 flops, weighted</option><option value="95">95 flops, weighted</option><option value="184">184 flops, weighted</option><option value="1755">All 1,755 distinct flops</option></select></label>
+          <label class="f">Threads<input id="threads" type="number" min="1" max="32" step="1"></label>
+          <label class="f">Target, % of pot<input id="target" type="number" min="0.01" step="0.05" value="0.5"></label>
+          <label class="f">Iteration limit per flop<input id="maxIt" type="number" min="5" step="10" value="150"></label>
+        </div>
+        <p class="hint" id="subsetInfo"></p>
+        <div class="rowbtns"><button class="btn primary" id="btnRun" type="button">Run report</button><button class="btn" id="btnStop" type="button" disabled>Stop</button><button class="btn" id="btnCsv" type="button" disabled>Export CSV</button></div>
+        <div class="progress"><i id="prog"></i></div>
+        <p class="status" id="status"></p>
+      </section>
+    </div>
+    <div class="col">
+      <section class="panel">
+        <h2>Summary <span class="h2r muted" id="sumInfo"></span></h2>
+        <div id="summary"><p class="muted">Run a report to see the weighted averages over the flop set.</p></div>
+      </section>
+      <section class="panel">
+        <h2>Flops <span class="h2r"><span class="modes" id="sortModes"><button type="button" data-s="order" aria-pressed="true">Board order</button><button type="button" data-s="bet">Most betting</button><button type="button" data-s="ev">Highest OOP EV</button></span></span></h2>
+        <div class="scroll"><table class="datatab" id="table"></table></div>
+      </section>
+    </div>
+  </div>
+</div>
+<script src="js/engine.js"></script>
+<script src="js/pool.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/reports.js"></script>
+</body>
+</html>
