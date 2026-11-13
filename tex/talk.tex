@@ -87,7 +87,7 @@ Extensions and next steps 8 $\cdot$ Questions 5.\\[4pt]
 Opening line: ``A poker solver is one numerical method, discounted counterfactual regret minimization, applied to a structured
 bilinear saddle-point problem. This talk is about what makes that method fast and accurate: how an iteration is organized,
 what it costs, how precise it must be and how it is split across processors.''\\[4pt]
-Every measured number comes from \texttt{web/experiments/run\_all.sh} and \texttt{tex/make\_talk\_data.py}. The machine is a
+Every measured number comes from the experiment scripts listed in \texttt{web/experiments/run\_all.sh}, with logs in \texttt{out/}, through \texttt{tex/make\_talk\_data.py}. The machine is a
 two-core cloud container, so absolute times are pessimistic.
 }
 \end{frame}
@@ -108,7 +108,7 @@ aggregate reports and a preflop solver for two to six players, and analyses its 
 \column{0.48\textwidth}
 \centering
 \includegraphics[width=\linewidth]{site_grid.png}\\[2pt]
-{\scriptsize The big blind's turn strategy on K$\spadesuit$7$\diamondsuit$2$\clubsuit$5$\spadesuit$ in the browser solver.
+{\footnotesize The big blind's turn strategy on K$\spadesuit$7$\diamondsuit$2$\clubsuit$5$\spadesuit$ in the browser solver.
 Green is check and red is bet.}
 \end{columns}
 \note{
@@ -335,7 +335,7 @@ The sort is cached per runout, so each evaluation is $O(n)$.
 \column{0.43\textwidth}
 \centering
 {\footnotesize\setlength\tabcolsep{4pt}\input{data/leaf_table.tex}}\\[4pt]
-{\scriptsize Microseconds per evaluation for $n$ hands. The direct method sums over all compatible pairs; the largest
+{\footnotesize Microseconds per evaluation for $n$ hands. The direct method sums over all compatible pairs; the largest
 relative difference is \LeafErr.}
 \end{columns}
 \note{
@@ -350,18 +350,18 @@ At 1081 hands the sweep is several hundred times faster than the direct sum and 
 % =====================================================================================
 \begin{frame}{A cost model for one iteration}
 \begin{columns}[T]
-\column{0.5\textwidth}
-The time of one iteration is modelled by four work counts:
+\column{0.42\textwidth}
+\small The time of one iteration is modelled by four work counts:
 \[ T \approx a\,W_{\mathrm{dec}} + b\,W_{\mathrm{show}} + c\,W_{\mathrm{fold}} + d\,W_{\mathrm{chance}}, \]
 where $W_{\mathrm{dec}}=\sum n_p|A|$ over decisions, and the other counts sum $n$ over leaves and $Kn$ over chance
-nodes. The leaf constants come from the leaf benchmark; $a$ and $d$ are fitted by nonnegative least squares over
-\CostTrees\ trees. In nanoseconds,
-\[ a = \CostA,\quad b = \CostB,\quad c = \CostC,\quad d = \CostD , \]
-and every measured time is within \CostResid\ of the model.
-\column{0.48\textwidth}
+nodes. The leaf costs per hand come from the leaf benchmark at the tree's $n$; $a$ and $d$ are fitted by nonnegative
+least squares over \CostTrees\ trees. In nanoseconds, at $n\approx470$,
+\[ a = \CostA,\quad b = \CostB,\quad c = \CostC,\quad d = \CostD . \]
+The fit is within \CostResid\ on every tree, and within \CostLoo\ when each tree is predicted from the others.
+\column{0.56\textwidth}
 \centering
-{\footnotesize\setlength\tabcolsep{3pt}\input{data/cost_table.tex}}\\[3pt]
-{\scriptsize Milliseconds per iteration on one core, measured and modelled, for trees that take at least 5 ms.}
+{\footnotesize\setlength\tabcolsep{2.5pt}\input{data/cost_table.tex}}\\[3pt]
+{\footnotesize Milliseconds per iteration on one core: measured, fitted, and predicted with the tree left out of the fit.}
 \end{columns}
 \note{
 Fitting all four constants at once is ill-posed: the fold work is nearly proportional to the decision work in every tree, so the
@@ -375,18 +375,19 @@ Adding a bet size multiplies the tree, because it adds a branch at every node of
 
 \begin{frame}{Memory}
 \begin{columns}[T]
-\column{0.5\textwidth}
-Each decision node stores regrets and strategy sums for every hand and action. In single precision this is
+\column{0.42\textwidth}
+\small Each decision node stores regrets and strategy sums for every hand and action. In single precision this is
 \[ \text{memory} \;=\; 8 \sum_{\text{decisions}} n_p\,|A| \ \text{bytes}. \]
 Storage is a few flat blocks of $2^{24}$ entries, and each node holds two views into them. This cut the allocation
 time of a 2.9 GB tree from 32 s to under a second.
 
 \medskip
-The interface estimates the memory before building, from the top of the tree and one card's subtree.
-\column{0.48\textwidth}
+The interface estimates the memory before building, from the top of the tree and one card's subtree; for the trees
+we built in full the estimate is within \MemEstErr.
+\column{0.56\textwidth}
 \centering
-{\footnotesize\setlength\tabcolsep{3pt}\input{data/mem_table.tex}}\\[4pt]
-{\scriptsize Flop K72. Bet sizes in percent of the pot, out of position / in position; ``cr 50'' is a check-raise of
+{\footnotesize\setlength\tabcolsep{2.5pt}\input{data/mem_table.tex}}\\[4pt]
+{\footnotesize Flop K72; MB estimated and, where built, actual. Bet sizes in percent of the pot, out of position / in position; ``cr 50'' is a check-raise of
 50\%, ``r 50'' a raise of 50\% and ``ai'' adds all-in. A dash means no bet.}
 \end{columns}
 \note{
@@ -400,31 +401,34 @@ number of cards is an accurate estimate.
 % =====================================================================================
 \begin{frame}{Floating-point precision}
 \begin{columns}[T]
-\column{0.48\textwidth}
-Regrets $R$ and strategy sums $S$ are stored in single precision; all arithmetic inside a traversal is double
+\column{0.5\textwidth}
+\small Regrets $R$ and strategy sums $S$ are stored in single precision; all arithmetic inside a traversal is double
 precision.
 
 \medskip
-Each stored update has relative rounding error $u = 2^{-24}$. The strategy sum grows like $t/3$ and the new term has
-relative size about $3/t$, so it is resolved while $3/t\gg u$, that is for $t\ll 10^7$.
+Each stored update has relative rounding error $u = 2^{-24}$, and a new term of relative size about $3/t$ is resolved
+while $t\ll10^7$.
 
 \medskip
 All four combinations of single and double precision for $R$ and $S$ reach the same exploitability, down to
-\PrecFloor\% of the pot. The reach-weighted mean $L^1$ distance between the strategies is \PrecDiff.
-\column{0.5\textwidth}
+\PrecFloor\% of the pot. The strategies can differ more than the exploitabilities: their reach-weighted $L^1$ distance is \PrecDiff, against
+\PrecBase\ between two double precision iterates at $T/1.1$ and $T$.
+\column{0.48\textwidth}
 \centering
 \includegraphics[width=\linewidth]{precision.pdf}\\
-{\scriptsize Exploitability with float32 or float64 storage of $R$ and $S$, on a small turn game (solid) and the
+{\footnotesize Exploitability with float32 or float64 storage of $R$ and $S$, on a small turn game (solid) and the
 turn spot (dashed).}
 \end{columns}
 \note{
-The strategy is a ratio of sums, so relative errors of the sums enter the strategy as relative errors of size $u$ per update. A term is
+The strategy sum with DCFR weights grows like $t/3$, so the new term has relative size about $3/t$. The strategy is a ratio of sums, so relative errors of the sums enter the strategy as relative errors of size $u$ per update. A term is
 lost only when its relative size falls below $u$, which needs about $10^7$ iterations.\\[3pt]
-The regrets grow like $\sqrt t$ and are resolved for longer. Rounding differences are amplified by the iteration, so the curves are
-not identical, but they cross repeatedly and differ by much less than the exploitability itself. An earlier version of the
+On the small game, rounding moves the iterates to a visibly different strategy with the same exploitability. The equilibrium set
+is not a point: actions that are never played and positions that are never reached give flat directions, and a perturbation of size
+$u$ per update can drift along them. The exploitability, which is what a solver guarantees, does not notice. An earlier version of the
 solver seemed to show a single-precision floor near $10^{-3}$\% of the pot; it disappeared with the exact zero-reach handling of the DCFR
 slide, so it was an artefact of the iteration, not of rounding.\\[3pt]
-Half the memory for the same result. This is why commercial solvers can go further and compress to 16-bit integers.
+On the turn spot the curves group by the precision of the regrets: the precision of the strategy sums makes no visible difference.
+Half the memory for the same result.
 }
 \end{frame}
 
@@ -444,8 +448,8 @@ $\lceil K/P\rceil$, the model is $T(P) \approx t_c + \lceil K/P\rceil\, t_1$.
 \column{0.45\textwidth}
 \centering
 {\footnotesize\setlength\tabcolsep{3pt}\input{data/parallel_table.tex}}\\[4pt]
-{\scriptsize Milliseconds per iteration in Chrome with Web Workers on the \ParCores-core test machine; the model is
-calibrated on $P=1$. Exploitabilities agree with the sequential solver to \ParAgree\ in relative terms.}
+{\footnotesize Median of five runs, in milliseconds per iteration, in Chrome with Web Workers on the \ParCores-core
+test machine. The model is calibrated on $P=1$.}
 \end{columns}
 \note{
 This is a domain decomposition of the tree with the first-level chance nodes as interface. The messages are two vectors of length $n$
@@ -455,7 +459,8 @@ The results differ from the sequential solver only in the order in which the cha
 On the flop, two workers reach \ParEff\ of the model's prediction. The model ignores message latency and the competition of the two
 workers for memory bandwidth and cache, and the main thread also runs the page. The model predicts \ParPredEight\ ms with eight workers. On the turn the passes are short, so the latency matters more.\\[3pt]
 In Node's worker threads the same partitioned traversal runs about \ParNodeOverhead\ slower than on the main thread for reasons we have
-not identified; in Chrome the overhead with one worker is about 2\%. In the browser the workers are Web Workers and the coordinator is the main thread. Games without a chance node, river spots, run in one worker.
+not identified; in Chrome the one-worker overhead is \ParOvFlop\ on the flop and \ParOvTurn\ on the turn, where the passes are short. The
+eight-worker figure is an extrapolation of the model, not a measurement. In the browser the workers are Web Workers and the coordinator is the main thread. Games without a chance node, river spots, run in one worker.
 }
 \end{frame}
 
@@ -464,25 +469,32 @@ not identified; in Chrome the overhead with one worker is about 2\%. In the brow
 \centering
 \includegraphics[width=\linewidth]{conv_streets.pdf}\\[2pt]
 \raggedright
-{\small Exploitability in percent of the pot. The dashed line is the 0.3\% target. Least-squares slopes of
-$\log\ex$ against $\log T$ over the last decade of each run, with standard errors: \ConvSlopes.}
+{\small Exploitability in percent of the pot; the dashed line is the 0.3\% target. Least-squares slopes of $\log\ex$
+against $\log T$ over the last twentieth, tenth and fifth of each run, given as a range: \ConvSlopes.}
 \note{
 All three methods use the same code and differ only in $(\alpha,\beta,\gamma)$. DCFR is fastest on every street. The slopes are
-empirical rates over one decade of iterations and should not be read as asymptotic rates; the worst-case bound is $T^{-1/2}$ for all
+empirical rates over the end of each run and depend on the window, as the ranges show; the flop windows still include
+part of the early transient. They should not be read as asymptotic rates; the worst-case bound is $T^{-1/2}$ for all
 three. Explaining why the modern variants do so much better on poker trees is an open problem.
 }
 \end{frame}
 
 % =====================================================================================
 \begin{frame}{Iterations to a fixed accuracy}
-DCFR on five river, five turn and three flop spots, with one tree per street. The table gives the median and the range of
-the iterations needed to reach each accuracy, in percent of the pot.
+DCFR on five river, five turn and three flop spots, with one tree per street: median and range of the iterations needed
+for each accuracy, in percent of the pot. Counts are the first checkpoint below the target, and checkpoints are 15\% apart.
 \begin{center}
-{\small\setlength\tabcolsep{8pt}\input{data/tol_table.tex}}
+{\footnotesize\setlength\tabcolsep{8pt}\input{data/tol_table.tex}}
 \end{center}
-The iterations for a practical accuracy vary by less than a factor of two between spots and do not grow with the size of
-the tree. The running time to a fixed accuracy is therefore governed by the cost per iteration, which grows by three
-orders of magnitude from the river to the flop.
+\begin{columns}[T]
+\column{0.5\textwidth}
+\small The iterations vary by less than a factor of two between spots. On one flop (right) they grow slowly with the
+tree: by a factor of about three while the number of decisions grows by four orders of magnitude. The running time to a
+fixed accuracy is therefore governed by the cost per iteration.
+\column{0.48\textwidth}
+\centering
+{\footnotesize\setlength\tabcolsep{4pt}\input{data/treesize_table.tex}}
+\end{columns}
 \note{
 Boards: river K72T4, A8492 two-tone, T9832, QJ552, 762KA; the turn spots are the first four cards of the same boards; flop spots K72
 rainbow, T98 two-tone and A84 two-tone. Ranges are the big blind's call and the button's open.\\[3pt]
@@ -497,18 +509,19 @@ This is the practical statement behind ``a few hundred iterations'': it is a mea
 \begin{tabular}{>{\raggedright\arraybackslash}p{3.3cm}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{4.7cm}}
 \toprule
 test & reference & result \\ \midrule
-River, talk example & the earlier independent solver & exploitability \RiverOldNew\ and \RiverOldOld\ chips after 5000 iterations \\
+River, talk example & the earlier implementation & same iterates: exploitability \RiverOldNew\ and \RiverOldOld\ chips after 5000 iterations \\
 Turn, one chance level & exact LP, \TurnHands\ hands & value \TurnJS\ against \TurnLP \\
 Flop, two chance levels & exact LP, \FlopHands\ hands & value \FlopJS\ against \FlopLP \\
 Heads-up push or fold & LP on the same tables & values agree to five digits \\
-Parallel partition & sequential solver & values agree to $10^{-14}$ \\
+Parallel partition & sequential solver & values and exploitability agree to $10^{-14}$ relative \\
 Zero-reach shortcut & traversal without shortcut & regrets and sums bit for bit \\
 Leaf evaluation & direct $O(n^2)$ sums & agreement to $10^{-12}$ \\ \bottomrule
 \end{tabular}
 \note{
 Each component has an independent check. The two LP tests build the game separately in Python with explicit chance nodes and solve
-the sequence-form LP exactly, so they test chance weighting, card removal and showdowns together; the remaining difference equals the
-exploitability left after 20{,}000 or 10{,}000 DCFR iterations. Values are compared rather than strategies, because equilibria are not
+the sequence-form LP exactly, so they test chance weighting, card removal and showdowns together; the remaining differences, $6\times10^{-8}$
+and $1\times10^{-5}$, are within the exploitability left after 20{,}000 and 10{,}000 DCFR iterations. The river row checks the new engine
+against the earlier implementation of the same algorithm: equal iterates, not an independent method. Values are compared rather than strategies, because equilibria are not
 unique.\\[3pt]
 A comparison with an established open-source solver on the same flop tree is the natural next test.
 }
@@ -520,7 +533,7 @@ A comparison with an established open-source solver on the same flop tree is the
 \column{0.58\textwidth}
 \centering
 \includegraphics[width=\linewidth]{site_browser.png}\\[2pt]
-{\scriptsize Strategy browser after a flop solve: the big blind's turn strategy after the flop checks through.}
+{\footnotesize Strategy browser after a flop solve: the big blind's turn strategy after the flop checks through.}
 \column{0.4\textwidth}
 \small
 The site has five pages: postflop, preflop and multiway, flop reports, the river table of the earlier talk and a
@@ -578,16 +591,19 @@ The symmetric group $S_4$ acts on the suits. Its orbits on the $\binom{52}{3}=22
 \medskip
 A report solves one spot on a subset and averages with weights equal to the orbit sizes represented. Subsets are
 stratified by texture and by rank, so the average is a stratified quadrature over all flops. Standard errors come from
-pairing neighbouring strata.
+pairing neighbouring strata. Each flop is solved to \ReportTol\% of the pot, which bounds its value error by twice that.
 \column{0.48\textwidth}
 \centering
 {\footnotesize\setlength\tabcolsep{3pt}\input{data/report_table.tex}}\\[4pt]
-{\scriptsize Weighted averages and standard errors on the flop tree with checked-down turn and river. The value is in
-chips with a pot of 5.5.}
+{\footnotesize Weighted averages, standard errors and the solver's error bound on the flop tree with checked-down turn and
+river. Values are in chips with a pot of 5.5.}
 \end{columns}
 \note{
 Burnside's lemma gives 1755 (appendix). Orbit sizes are 24 for rainbow boards, 12 for two-tone and paired boards and 4 for monotone and
 trips boards.\\[3pt]
+The value of the average strategy differs from the equilibrium value by at most the larger best-response gain, hence by at most twice
+the exploitability; the table gives this bound averaged over the flops. Bet frequencies have no such bound, which is why the flops are
+solved to a tight tolerance.\\[3pt]
 The report is a quadrature of a function of the flop. The collapsed-strata variance estimator pairs neighbouring strata and treats the
 pair as one stratum with two draws, which overestimates the variance slightly. The estimates agree within their standard errors as the
 subset grows.
@@ -626,16 +642,20 @@ The equity tables are Monte Carlo estimates, so the preflop solver solves a pert
 has payoff error $\Pi\,|\hat e - e|$.
 
 \medskip
-With two independent tables the entries differ by \SensRms\ in root mean square and \SensMax\ at most. The resulting
-equilibria differ much less than this worst case suggests:
+Two independent tables differ by \SensRms\ in root mean square and \SensMax\ at most, so with $\delta$ the pot times
+that maximum each solution is a $(\varepsilon+2\delta)$-equilibrium of the other game. The measured cross-exploitability
+is far smaller:
 \begin{center}
 {\footnotesize\setlength\tabcolsep{5pt}\input{data/sens_table.tex}}
 \end{center}
 \note{
 Proof of the lemma: each best-response value is a maximum of expected payoffs, each of which moves by at most $\delta$, so each half of
 the exploitability moves by at most $\delta/2$ in our normalization.\\[3pt]
-The worst-case bound uses the largest table error and is pessimistic: errors of different entries have different signs and average
-out over a range. The two-table experiment measures the actual effect.\\[3pt]
+The bound $\varepsilon+2\delta$ follows by applying the lemma twice, from table 1 to the true game and from the true game to table 2,
+with $\delta$ the largest difference of either table from the truth; we use the observed difference of the two tables as its proxy.
+Cross-exploitability is the exploitability of the table-1 solution measured in the table-2 game. It is three orders of magnitude below
+the bound, because errors of different entries have different signs and average out over a range. The push frequencies of the two
+solutions differ by at most 0.4 percentage points; the lemma says nothing about strategies, which need not be unique.\\[3pt]
 The same lemma covers the low-rank approximation of the next slide, with $\delta$ equal to the pot times the contraction error.
 }
 \end{frame}
@@ -653,7 +673,7 @@ reduces this to $2\cdot169\cdot R$ per class.
 \column{0.5\textwidth}
 \small
 The slices are not close to low rank, but the contraction with nonnegative ranges is: rank 16 gives a relative error
-of \LowRankErr, the size of the Monte Carlo error of the table, at a twentieth of the cost.
+of \LowRankErr\ at about a fifth of the cost, since $169^2/(2\cdot169\cdot16)\approx5.3$.
 \end{columns}
 \note{
 Errors are the largest over the 169 classes. The slice error is the relative Frobenius error of $F_i$; the contraction error is the
@@ -671,12 +691,12 @@ With three or more players the game is not zero-sum between two sides, and DCFR 
 NashConv, the sum over players of the gain from a best response.
 
 \medskip
-Push-or-fold games converge to $10^{-6}$ bb or below. The deep six-player trees reduce NashConv to a few hundredths of a
-big blind per hand and then stall.
+Push-or-fold games reach a NashConv of about $10^{-6}$ bb. The 20 bb six-player tree stalls near \MultiTwenty\ bb per hand;
+the 100 bb tree is still decreasing at the end of the run.
 \column{0.52\textwidth}
 \centering
 {\footnotesize\setlength\tabcolsep{3pt}\input{data/pf_multi_table.tex}}\\[4pt]
-{\scriptsize NashConv in big blinds per hand after the stated number of iterations; milliseconds per iteration on one
+{\footnotesize NashConv in big blinds per hand after the stated number of iterations; milliseconds per iteration on one
 core.}
 \end{columns}
 \note{
@@ -761,14 +781,14 @@ vectors, leaves, memory and processors. Then take questions.}
 \appendix
 \begin{frame}{Appendix: the showdown sweep}
 \small
-The input is the own list sorted by strength $\sigma_h$, the opponent list sorted by strength and the opponent reach $r$.
+The input is the own list sorted by strength $q_h$, the opponent list sorted by strength and the opponent reach $r$.
 \begin{enumerate}\setlength\itemsep{2pt}
 \item Set $\tau=0$ and $s_c=0$ for all cards $c$.
-\item For each block of own hands with equal strength $\sigma$:
+\item For each block of own hands with equal strength $q$:
   \begin{enumerate}
-  \item add every opponent hand $j$ with $\sigma_j<\sigma$ to $\tau$ and to $s_c$ for its two cards;
+  \item add every opponent hand $j$ with $q_j<q$ to $\tau$ and to $s_c$ for its two cards;
   \item for each own hand $h$ of the block set $L(h)=\tau-s_{h_1}-s_{h_2}$;
-  \item add every opponent hand with $\sigma_j=\sigma$, and set $L^{=}(h)=\tau-s_{h_1}-s_{h_2}+r_{\bar h}$.
+  \item add every opponent hand with $q_j=q$, and set $L^{=}(h)=\tau-s_{h_1}-s_{h_2}+r_{\bar h}$.
   \end{enumerate}
 \item After the sweep, $m(h)$ is the fold formula with the final sums.
 \end{enumerate}

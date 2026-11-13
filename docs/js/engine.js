@@ -468,7 +468,7 @@
       for (let j = 0; j < nq; j++) { const x = ro[j] * sig[o + j]; ro2[j] = x; if (x !== 0) any = true; }
       if (this.noSkip) any = true;
       if (!any) {
-        if (mode === 0 || mode === 3) { this.zr = true; this.walk(node.ch[a], p, ro2, rs, depth + 1, mode); this.zr = false; }
+        if (mode === 0 || mode === 3) { const z = this.zr; this.zr = true; this.walk(node.ch[a], p, ro2, rs, depth + 1, mode); this.zr = z; }
         continue;
       }
       const v = this.walk(node.ch[a], p, ro2, rs, depth + 1, mode);

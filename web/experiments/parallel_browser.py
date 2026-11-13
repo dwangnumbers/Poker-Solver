@@ -13,9 +13,13 @@ async () => {
   const out = [];
   for (const [k, sp] of Object.entries(spots)) {
     const cfg = { board: sp.board.match(/../g).map(E.cardOf), pot: sp.pot, stack: sp.stack, ranges, tree: sp.tree };
-    const s = new E.Solver(E.buildGame(cfg)); s.iterate(2); let t0 = performance.now(); s.iterate(4); const seq = (performance.now() - t0) / 4;
-    const row = { spot: k, seq };
-    for (const K of [1, 2]) { const pool = await P.create(cfg, { workers: K, url: 'js/worker.js' }); await pool.iterate(2); t0 = performance.now(); await pool.iterate(4); row['P' + K] = (performance.now() - t0) / 4; pool.terminate(); }
+    const REP = 5, reps = { seq: [], P1: [], P2: [] };
+    const s = new E.Solver(E.buildGame(cfg)); s.iterate(2);
+    for (let r = 0; r < REP; r++) { const t0 = performance.now(); s.iterate(4); reps.seq.push((performance.now() - t0) / 4); }
+    for (const K of [1, 2]) { const pool = await P.create(cfg, { workers: K, url: 'js/worker.js' }); await pool.iterate(2);
+      for (let r = 0; r < REP; r++) { const t0 = performance.now(); await pool.iterate(4); reps['P' + K].push((performance.now() - t0) / 4); } pool.terminate(); }
+    const med = a => a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)];
+    const row = { spot: k, reps, seq: med(reps.seq), P1: med(reps.P1), P2: med(reps.P2) };
     out.push(row);
   }
   return out;

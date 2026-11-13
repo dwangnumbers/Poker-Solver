@@ -43,11 +43,11 @@ def table(name, header, rows, align):
     (data / f"{name}.tex").write_text(s)
 
 
-def slope(pts):
-    """least-squares slope of log(expl) against log(T) over the last decade [T/10, T], with its standard error"""
+def slope(pts, frac=10):
+    """least-squares slope of log(expl) against log(T) over [T/frac, T], with its regression standard error"""
     pts = [p for p in pts if p[1] > 0]
     T = pts[-1][0]
-    q = [p for p in pts if p[0] >= T / 10]
+    q = [p for p in pts if p[0] >= T / frac]
     x = np.log([p[0] for p in q]); y = np.log([p[1] for p in q])
     A = np.vstack([x, np.ones_like(x)]).T
     coef, res, *_ = np.linalg.lstsq(A, y, rcond=None)
@@ -72,7 +72,8 @@ for ax, (key, d) in zip(axes, conv.items()):
         ax.set_ylabel("exploitability, % of pot")
         ax.legend(fontsize=8)
     for name, pts in d["series"].items():
-        slopes.append((key, name) + slope(pts))
+        ss = [slope(pts, f)[0] for f in (5, 10, 20)]
+        slopes.append((key, name, min(ss), max(ss)))
         last = pts[-1]
         macros[f"Conv{key.capitalize()}{name.replace('+', 'p')}"] = "$" + sci(last[1], 1) + "$"
     dc = d["series"].get("DCFR")
@@ -83,8 +84,8 @@ fig.tight_layout()
 fig.savefig(figs / "conv_streets.pdf")
 plt.close(fig)
 by = {}
-for key, name, sl, se, npts in slopes:
-    by.setdefault(name, []).append(f"{sl:.2f}\\pm{se:.2f}")
+for key, name, lo, hi in slopes:
+    by.setdefault(name, []).append(f"[{lo:.1f}, {hi:.1f}]")
 macros["ConvSlopes"] = "; ".join(f"{n.replace('+', '$^+$')} ${', '.join(v)}$" for n, v in by.items()) + " for river, turn and flop"
 
 # ---- leaf cost
@@ -367,14 +368,104 @@ if lr:
     table("lowrank_table", ["$R$", "slice error", "contraction error"], [[str(r["rank"]), f"${sci(r['sliceError'], 1)}$", f"${sci(r['contractionError'], 1)}$"] for r in lr["rows"] if r["rank"] in (1, 4, 8, 16, 32)], "rrr")
     mac("LowRankErr", "$" + sci(next(r for r in lr["rows"] if r["rank"] == 16)["contractionError"], 1) + "$")
 
+# =====================================================================================  third round
+# cost model with leaf cost per hand interpolated at the tree's n, and leave-one-out validation
+if sc and "foldWork" in sc[0] and lcb:
+    from scipy.optimize import nnls
+    ns = np.array([r["n"] for r in lcb], float)
+    def per_hand(key, n):
+        return np.interp(n, ns, [r[key] / r["n"] for r in lcb])
+    fit = [r for r in sc if r["msPerIter"] >= 5]
+    def leaf_ms(r):
+        n = (r["n"][0] + r["n"][1]) / 2
+        return 2e-3 * (per_hand("sweep_us", n) * r["showWork"] + per_hand("fold_us", n) * r["foldWork"])
+    def fitab(rows):
+        X = np.array([[r["work"], r["chanceWork"]] for r in rows], float)
+        y = np.array([r["msPerIter"] - leaf_ms(r) for r in rows], float)
+        w = 1 / np.array([r["msPerIter"] for r in rows])
+        return nnls(X * w[:, None], y * w)[0]
+    coef = fitab(fit)
+    model = lambda r, c: c[0] * r["work"] + c[1] * r["chanceWork"] + leaf_ms(r)
+    loo = []
+    for k, r in enumerate(fit):
+        c = fitab(fit[:k] + fit[k + 1:])
+        loo.append(model(r, c))
+    rel_in = max(abs(model(r, coef) - r["msPerIter"]) / r["msPerIter"] for r in fit)
+    rel_loo = max(abs(m - r["msPerIter"]) / r["msPerIter"] for m, r in zip(loo, fit))
+    mac("CostA", f"{1e6 * coef[0]:.1f}"); mac("CostD", f"{1e6 * coef[1]:.1f}")
+    n0 = np.mean([(r["n"][0] + r["n"][1]) / 2 for r in fit])
+    mac("CostB", f"{2e3 * per_hand('sweep_us', n0):.0f}"); mac("CostC", f"{2e3 * per_hand('fold_us', n0):.0f}")
+    mac("CostResid", f"{100 * rel_in:.0f}\\%"); mac("CostLoo", f"{100 * rel_loo:.0f}\\%")
+    rows = [[r["name"], f"{r['decisions']:,}", f"{r['msPerIter']:.0f}", f"{model(r, coef):.0f}", f"{m:.0f}"] for r, m in zip(fit, loo)]
+    table("cost_table", ["tree", "decisions", "measured", "model", "held out"], rows, "lrrrr")
+    fl = next((r for r in sc if r["name"] == "flop, 1 size per street"), None)
+    if fl:
+        mac("FlopLeafShare", f"{100 * leaf_ms(fl) / fl['msPerIter']:.0f}\\%")
+    if rf:
+        mac("RoofRatio", f"{1e6 * coef[0] / rf['updateNsPerEntry']:.0f}")
+# memory estimate against actual
+me = load("memest")
+if me:
+    act = [r for r in me if "actualMB" in r]
+    table("mem_table", ["flop", "turn", "river", "MB", "built"], [[r["flop"], r["turn"], r["river"], f"{r['MB']:,.0f}", f"{r['actualMB']:,.0f}" if "actualMB" in r else "--"] for r in me], "lllrr")
+    if act:
+        e = 100 * max(abs(r['MB'] - r['actualMB']) / r['actualMB'] for r in act)
+        mac("MemEstErr", "0.1\\%" if e < 0.1 else f"{e:.1f}\\%")
+# tree sizes at a fixed flop
+fz = load("convspots_flopsize")
+if fz:
+    names = ["later streets checked down", "river checked down", "one size per street", "standard"]
+    rows = [[nm, f"{r['decisions']:,}", str(r["hit"].get("0.3", "--")), str(r["hit"].get("0.1", "--"))] for nm, r in zip(names, fz)]
+    table("treesize_table", ["K72 tree", "decisions", "0.3\\%", "0.1\\%"], rows, "lrrr")
+# precision baseline
+pbs = load("precbase")
+if pbs:
+    mac("PrecBase", "$" + sci(pbs["small turn game"], 1) + "$" + (" and $" + sci(pbs["turn spot"], 1) + "$" if "turn spot" in pbs else ""))
+# parallel: medians of repeated browser runs, overheads
+if pb:
+    for r in pb:
+        ov = 100 * (r['P1'] / r['seq'] - 1)
+        mac("ParOvFlop" if r["spot"] == "flop" else "ParOvTurn", "under 1\\%" if ov < 1 else f"{ov:.0f}\\%")
+# payoff sensitivity with cross-exploitability
+if ps and "crossExpl" in ps["rows"][0]:
+    rows = [[f"{r['stack']} bb", f"{r['valA']:.5f}", f"{r['valB']:.5f}", "$" + sci(r["crossExpl"], 1) + "$", f"{2 * 2 * r['stack'] * ps['maxTableDiff']:.2f}"] for r in ps["rows"]]
+    table("sens_table", ["stack", "value, table 1", "value, table 2", "cross-exploitability", "$2\\delta$"], rows, "rrrrr")
+# multiway
+if mu:
+    k20 = next((v for k, v in mu.items() if "20 bb" in k), None)
+    if k20:
+        mac("MultiTwenty", f"{k20['pts'][-1][1]:.2f}")
+# report with the tight tolerance, with the solver error bound 2 expl
+rt, rt95 = load("reportsub_tight"), load("reportsub_tight95")
+if rt or rt95:
+    rowsall = (rt["rows"] if rt else []) + (rt95["rows"] if rt95 else [])
+    rows = []
+    for r in sorted(rowsall, key=lambda r: r["n"]):
+        fl = r["flops"]; W = sum(f["w"] for f in fl)
+        def est(key):
+            m = sum(f["w"] * f[key] for f in fl) / W
+            var = 0.0; byg = {}
+            for f in fl:
+                byg.setdefault(f["group"], []).append(f)
+            for g in byg.values():
+                for i in range(0, len(g) - 1, 2):
+                    a, b = g[i], g[i + 1]
+                    var += ((a["w"] + b["w"]) / W) ** 2 * (a[key] - b[key]) ** 2 / 4
+            return m, math.sqrt(var)
+        v, ve = est("val0"); b_, be = est("oopBet")
+        bias = 2 * sum(f["w"] * f["expl"] for f in fl) / W / 100 * 5.5
+        rows.append([str(r["n"]), pm(v, ve, 3), f"{bias:.4f}", pm(100 * b_, 100 * be, 1) + "\\%"])
+    table("report_table", ["flops", "big blind value", "solver bound", "big blind bets"], rows, "rrrr")
+    mac("ReportTol", f"{(rt or rt95)['tol']}")
+
 # placeholders for anything still missing, so that the deck compiles
-needed = ["FlopLeafShare", "ParEff", "ParNodeOverhead", "FlopInfosets", "CostA", "CostB", "CostC", "CostD", "CostTrees", "CostResid", "FlopShowLeaves", "RoofUpdNs", "RoofCopyGBs", "RoofRatio",
+needed = ["CostLoo", "MemEstErr", "PrecBase", "ParOvFlop", "ParOvTurn", "MultiTwenty", "ReportTol", "FlopLeafShare", "ParEff", "ParNodeOverhead", "FlopInfosets", "CostA", "CostB", "CostC", "CostD", "CostTrees", "CostResid", "FlopShowLeaves", "RoofUpdNs", "RoofCopyGBs", "RoofRatio",
           "PrecFloor", "PrecDiff", "ParCores", "ParBytes", "ParAgree", "ParPredEight", "RiverOldNew", "RiverOldOld", "TurnLP", "TurnJS", "TurnHands",
           "FlopLP", "FlopJS", "FlopHands", "LockItBefore", "LockItAfter", "LockValAfter", "LockValBefore", "LockFoldAfter", "LockFoldBefore",
           "LockBetBefore", "SensRms", "SensMax", "LowRankErr", "DDensity", "ConvSlopes", "LeafErr"]
 for k in needed:
     macros.setdefault(k, "??")
-for t in ("tol_table", "cost_table", "sens_table", "report_table"):
+for t in ("tol_table", "cost_table", "sens_table", "report_table", "treesize_table"):
     if not (data / f"{t}.tex").exists():
         (data / f"{t}.tex").write_text("\\textit{pending}\n")
 (data / "numbers2.tex").write_text("".join(f"\\newcommand{{\\{k}}}{{{v}}}\n" for k, v in sorted(macros.items())))

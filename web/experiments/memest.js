@@ -16,6 +16,8 @@ for (const [f, t, r, tree] of trees) {
   const top = E.buildGame(cfg, { topOnly: true }), used = new Set(cfg.board); let c0 = 0; while (used.has(c0)) c0++;
   const own = new Array(52).fill(false); own[c0] = true; const one = E.buildGame(cfg, { own }), K = 49;
   const mem = top.memBytes + (one.memBytes - top.memBytes) * K, dec = top.decisions.length + (one.decisions.length - top.decisions.length) * K;
-  out.push({ flop: f, turn: t, river: r, MB: mem / 1e6, decisions: dec }); console.log(f, '|', t, '|', r, '|', (mem / 1e6).toFixed(0), 'MB', dec);
+  const row = { flop: f, turn: t, river: r, MB: mem / 1e6, decisions: dec };
+  if (mem < 1e9) { const full = E.buildGame(cfg); row.actualMB = full.memBytes / 1e6; row.actualDecisions = full.decisions.length; }
+  out.push(row); console.log(f, '|', t, '|', r, '|', (mem / 1e6).toFixed(1), 'MB', dec, row.actualMB ? 'actual ' + row.actualMB.toFixed(1) + ' MB ' + row.actualDecisions : '');
 }
 fs.writeFileSync(__dirname + '/out/memest.json', JSON.stringify(out));
