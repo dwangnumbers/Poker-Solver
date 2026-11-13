@@ -236,12 +236,14 @@ DCFR discounts the cumulative quantities at iteration $t$ before adding the new 
 We use $(\alpha,\beta,\gamma) = (1.5,0,2)$ and update the players alternately. CFR is the limit $\alpha=\beta=\infty$,
 $\gamma=0$, and CFR$^+$ is $\alpha=\infty$, $\beta=-\infty$, $\gamma=1$.
 \begin{block}{Theorem (Brown and Sandholm 2019)}
-With $(\alpha,\beta,\gamma)=(1.5,0,2)$ the weighted average strategies form a
+With $(\alpha,\beta,\gamma)=(1.5,0,2)$ and simultaneous updates, the weighted average strategies form a
 $6\Delta|\mathcal I|\big(\sqrt{|A|}+1/\sqrt T\big)/\sqrt T$ equilibrium after $T$ iterations.
 \end{block}
 The implementation computes exactly these iterates: subtrees that the opponent cannot reach are still visited to apply
 the discounts and strategy sums, and only their leaves are skipped.
 \note{
+The theorem is proved for simultaneous updates. The solver alternates the players, which is standard practice; regret bounds for
+alternating updates are discussed by Burch, Morav\v{c}\'{\i}k and Schmid (2019).\\[3pt]
 Discounting is a forgetting factor. Positive regrets lose a fraction $1/(t^{1.5}+1)$, negative regrets are halved, and the average
 gives weight proportional to $t^2$ to iteration $t$. Alternating updates are Gauss--Seidel in place of Jacobi.\\[3pt]
 Exactness matters. An earlier version skipped subtrees with zero opponent reach entirely, which also skipped their discounts and
@@ -357,7 +359,8 @@ absorbed into $a$ and $b$.
 \begin{columns}[T]
 \column{0.42\textwidth}
 \small Times are median milliseconds per iteration on one core. A fit to \CostPairs\ timed iterations of \CostTrees\ trees gives $a=\CostA$ and $b=\CostB$ ns. Predicted from
-the other trees, the median error is \CostLoo\ on the two largest flop trees and at most \CostLooAll.
+the other trees, the median error is \CostLoo\ on the two largest flop trees and at most \CostLooAll. The model
+under-predicts leaf-dominated trees, so it misses some per-leaf overhead.
 \column{0.56\textwidth}
 \centering
 {\footnotesize\setlength\tabcolsep{2.5pt}\input{data/cost_table.tex}}
@@ -507,14 +510,15 @@ This is the practical statement behind ``a few hundred iterations'': it is a mea
 
 % =====================================================================================
 \begin{frame}{Validation}
-\small
-\renewcommand{\arraystretch}{1.15}
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
 \begin{tabular}{>{\raggedright\arraybackslash}p{3.3cm}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{4.7cm}}
 \toprule
 test & reference & result \\ \midrule
 River, talk example & the earlier implementation & same iterates: exploitability \RiverOldNew\ and \RiverOldOld\ chips after 5000 iterations \\
 Turn, one chance level & exact LP, \TurnHands\ hands & value \TurnJS\ against \TurnLP \\
 Flop, two chance levels & exact LP, \FlopHands\ hands & value \FlopJS\ against \FlopLP \\
+Turn, mid size & exact LP, \TurnMidHands\ hands & value \TurnMidJS\ against \TurnMidLP \\
 Heads-up push or fold & LP on the same tables & values agree to five digits \\
 Parallel partition & sequential solver & values and exploitability agree to $10^{-14}$ relative \\
 Zero-reach shortcut & traversal without shortcut & regrets and sums bit for bit \\
@@ -524,7 +528,9 @@ Leaf evaluation & direct $O(n^2)$ sums & agreement to $10^{-12}$ \\ \bottomrule
 Most components have an independent check. The two LP tests build the game separately in Python with explicit chance nodes and solve
 the sequence-form LP exactly, so they test chance weighting, card removal and showdowns together; the remaining differences, $6\times10^{-8}$
 and $1\times10^{-5}$, are within the exploitability left after 20{,}000 and 10{,}000 DCFR iterations. The river row checks the new engine
-against the earlier implementation of the same algorithm: equal iterates, not an independent method. Values are compared rather than strategies, because equilibria are not
+against the earlier implementation of the same algorithm: equal iterates, not an independent method. The mid-size turn LP, with 40 and
+35 hands drawn at random, exercises card removal among overlapping hands, ties and chance weighting; its difference \TurnMidDiff\ is within
+the remaining exploitability \TurnMidExpl. Values are compared rather than strategies, because equilibria are not
 unique.\\[3pt]
 A comparison with an established open-source solver on the same flop tree is the natural next test.
 }
@@ -716,8 +722,8 @@ theory.
 \item Multiway solutions have no equilibrium guarantee and use an independence approximation for card removal
 between opponents.
 \item Parallel scaling has been measured on two cores only.
-\item The flop solver has not yet been compared with an established solver on the same tree; the exact checks cover
-small games only.
+\item The flop solver has not yet been compared with an established solver on the same tree; the exact checks
+cover games of up to 40 hands per player.
 \end{itemize}
 \note{
 The browser engine is plain JavaScript; the next slide lists the steps that close most of the gap to native solvers. The preflop
@@ -777,6 +783,7 @@ vectors, leaves, memory and processors. Then take questions.}
 \item O.~Tammelin. Solving large imperfect information games using CFR$^+$. arXiv:1407.5042 (2014).
 \item N.~Brown, T.~Sandholm. Solving imperfect-information games via discounted regret minimization. \emph{AAAI} 2019.
 \item N.~Brown, T.~Sandholm. Superhuman AI for multiplayer poker. \emph{Science} 365 (2019).
+\item N.~Burch, M.~Morav\v{c}\'{\i}k, M.~Schmid. Revisiting CFR$^+$ and alternating updates. \emph{J.\ Artif.\ Intell.\ Res.} 64 (2019).
 \end{itemize}
 \end{frame}
 

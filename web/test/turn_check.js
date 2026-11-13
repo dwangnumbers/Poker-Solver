@@ -4,10 +4,11 @@ let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648
 const board = ['Ks','7d','2c','Th'];
 const bc = board.map(E.cardOf);
 function pick(k) { const out = new Set(); while (out.size < k) { const a = Math.floor(rnd() * 52), b = Math.floor(rnd() * 52); if (a === b || bc.includes(a) || bc.includes(b)) continue; out.add(E.COMBO_ID[a * 52 + b]); } return [...out]; }
-const H = [pick(14), pick(12)];
+const N0 = +process.argv[2] || 14, N1 = +process.argv[3] || 12, OUT = process.argv[4] || 'turn_lp';
+const H = [pick(N0), pick(N1)];
 const toStr = k => E.cardStr(E.COMBO_A[k]) + E.cardStr(E.COMBO_B[k]);
 const cfg = { board, hands: H.map(l => l.map(toStr)), pot: 100, stack: 1000, turn_bet: 0.5, river_bet: 1.0 };
-fs.writeFileSync('/tmp/turn_cfg.json', JSON.stringify(cfg));
+fs.writeFileSync(`/tmp/${OUT}_cfg.json`, JSON.stringify(cfg));
 const ranges = H.map(l => { const r = new Float64Array(1326); for (const k of l) r[k] = 1; return r; });
 const tree = { streets: { flop: { oop: { bet: [] }, ip: { bet: [] } },
   turn: { oop: { bet: [50] }, ip: { bet: [50] } }, river: { oop: { bet: [100] }, ip: { bet: [100] } } }, maxBets: 1, allinThreshold: 2, mergeTolerance: 0 };
@@ -15,6 +16,6 @@ const g = E.buildGame({ board: bc, pot: 100, stack: 1000, ranges, tree });
 const s = new E.Solver(g);
 const out = { hands: H.map(l => l.length), decisions: g.decisions.length, js: [] };
 for (const T of [2000, 20000]) { s.iterate(T - s.t); const r = s.evaluate(); out.js.push({ T, value0: r.val[0], expl: r.expl }); console.log('JS', T, 'value0', r.val[0].toFixed(8), 'expl', r.expl.toExponential(3), 'Z', g.Z); }
-const lp = JSON.parse(execSync('python3 ' + __dirname + '/turn_lp.py /tmp/turn_cfg.json').toString()); out.lp = lp.value0;
+const t0 = Date.now(); const lp = JSON.parse(execSync('python3 ' + __dirname + `/turn_lp.py /tmp/${OUT}_cfg.json`, { maxBuffer: 1e8 }).toString()); out.lp = lp.value0; out.lpSeconds = (Date.now() - t0) / 1000;
 console.log('LP', lp.value0.toFixed(9));
-fs.writeFileSync(__dirname + '/../experiments/out/turn_lp.json', JSON.stringify(out));
+fs.writeFileSync(__dirname + `/../experiments/out/${OUT}.json`, JSON.stringify(out));

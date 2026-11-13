@@ -419,7 +419,7 @@ if cp:
         ins.append(e_in); loos.append((t["name"], e_lo))
         spread.append((np.max(y[m]) - np.min(y[m])) / np.median(y[m]))
         rows.append([t["name"], f"{t['decisions']:,}", f"{np.median(y[m]):.0f}", f"{np.median(pred[m]):.0f}", f"{100 * e_lo:.0f}\\%"])
-    table("cost_table", ["tree", "decisions", "measured", "model", "held out"], rows, "lrrrr")
+    table("cost_table", ["tree", "decisions", "measured", "model", "held-out error"], rows, "lrrrr")
     mac("CostA", f"{1e6 * coef[0]:.0f}"); mac("CostB", f"{1e6 * coef[1]:.0f}"); mac("CostTrees", str(len(cp)))
     mac("CostPairs", str(len(rows_)))
     fl = [e for nm, e in loos if nm.startswith("flop")]
@@ -468,7 +468,7 @@ if pb:
         mac("ParOvFlop" if r["spot"] == "flop" else "ParOvTurn", "under 1\\%" if ov < 1 else f"{ov:.0f}\\%")
 # payoff sensitivity with cross-exploitability
 if ps and "crossExpl" in ps["rows"][0]:
-    rows = [[f"{r['stack']} bb", f"{r['valA']:.5f}", f"{abs(r['valA'] - r['valB']):.1e}", "$" + sci(r["crossExpl"], 1) + "$", f"{2 * r['stack'] * ps['maxTableDiff']:.2f}"] for r in ps["rows"]]
+    rows = [[f"{r['stack']} bb", f"{r['valA']:.5f}", "$" + sci(abs(r['valA'] - r['valB']), 1) + "$", "$" + sci(r["crossExpl"], 1) + "$", f"{2 * r['stack'] * ps['maxTableDiff']:.2f}"] for r in ps["rows"]]
     table("sens_table", ["stack", "value", "value change", "cross-exploitability", "$\\delta$"], rows, "rrrrr")
 # multiway
 if mu:
@@ -522,8 +522,13 @@ if pT:
     mac("CondDist", "$" + sci(np.median([r["dist"] for r in sm]), 1) + "$")
     mac("CondExplHi", "$" + sci(sm[0]["expl"], 1) + "$"); mac("CondExplLo", "$" + sci(sm[-1]["expl"], 1) + "$")
 
+tm = load("turn_lp_mid40")
+if tm:
+    mac("TurnMidLP", f"{tm['lp']:.8f}"); mac("TurnMidJS", f"{tm['js'][-1]['value0']:.8f}"); mac("TurnMidHands", f"{tm['hands'][0]} and {tm['hands'][1]}")
+    mac("TurnMidDiff", "$" + sci(abs(tm['lp'] - tm['js'][-1]['value0']), 0) + "$"); mac("TurnMidExpl", "$" + sci(tm['js'][-1]['expl'], 0) + "$")
+
 # placeholders for anything still missing, so that the deck compiles
-needed = ["CondDist", "CondExplHi", "CondExplLo", "CostPairs", "CostLooFlop", "CostLooAll", "CostIterSpread", "ParIqr", "CostSpread", "FlopShowEval", "PertDist", "FlatClear", "FlatIndiff", "CostLoo", "MemEstErr", "PrecBase", "ParOvFlop", "ParOvTurn", "MultiTwenty", "ReportTol", "FlopLeafShare", "ParEff", "ParNodeOverhead", "FlopInfosets", "CostA", "CostB", "CostTrees", "CostResid", "FlopShowLeaves", "RoofUpdNs", "RoofCopyGBs", "RoofRatio",
+needed = ["TurnMidLP", "TurnMidJS", "TurnMidHands", "TurnMidDiff", "TurnMidExpl", "CondDist", "CondExplHi", "CondExplLo", "CostPairs", "CostLooFlop", "CostLooAll", "CostIterSpread", "ParIqr", "CostSpread", "FlopShowEval", "PertDist", "FlatClear", "FlatIndiff", "CostLoo", "MemEstErr", "PrecBase", "ParOvFlop", "ParOvTurn", "MultiTwenty", "ReportTol", "FlopLeafShare", "ParEff", "ParNodeOverhead", "FlopInfosets", "CostA", "CostB", "CostTrees", "CostResid", "FlopShowLeaves", "RoofUpdNs", "RoofCopyGBs", "RoofRatio",
           "PrecFloor", "PrecDiff", "ParCores", "ParBytes", "ParAgree", "ParPredEight", "RiverOldNew", "RiverOldOld", "TurnLP", "TurnJS", "TurnHands",
           "FlopLP", "FlopJS", "FlopHands", "LockItBefore", "LockItAfter", "LockValAfter", "LockValBefore", "LockFoldAfter", "LockFoldBefore",
           "LockBetBefore", "SensRms", "SensMax", "LowRankErr", "DDensity", "ConvSlopes", "LeafErr"]
