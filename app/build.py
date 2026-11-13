@@ -1,7 +1,7 @@
 """Assemble the app from app/src into single self-contained HTML files.
 
-  python3 app/build.py            writes app/poker-solver.html (open it in any browser, works offline)
-                                  and docs/index.html, the GitHub Pages site
+  python3 app/build.py            writes app/poker-solver.html (open it in any browser, works offline);
+                                  web/build.py copies it into the site as docs/demo.html
   python3 app/build.py OUT.html   also writes the same page as a fragment without <html>/<head> wrappers
 """
 import pathlib
@@ -18,12 +18,7 @@ page = ("<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n
         f"<title>River Solver Table</title>\n{font}\n<style>body{{margin:0}}</style>\n</head>\n<body>\n{core}</body>\n</html>\n")
 (here / "poker-solver.html").write_text(page)
 print("wrote", here / "poker-solver.html", len(page) // 1024, "kB")
-# the same page is the GitHub Pages site (Settings -> Pages -> main, /docs)
-site = here.parent / "docs"
-site.mkdir(exist_ok=True)
-(site / "index.html").write_text(page)
-(site / ".nojekyll").write_text("")
-print("wrote", site / "index.html")
+# the site in docs/ is assembled by web/build.py, which adds this page as docs/demo.html
 
 if len(sys.argv) > 1:
     frag = f"<title>River Solver Table</title>\n<meta name=\"claude:viewport-fit-sides\" content=\"cover\">\n{font}\n{core}"

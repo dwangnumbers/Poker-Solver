@@ -1,0 +1,12 @@
+const E = require('../js/engine.js');
+const BB = '22+,A2s+,K2s+,Q4s+,J6s+,T6s+,96s+,85s+,75s+,64s+,53s+,43s,A2o+,K8o+,Q9o+,J9o+,T8o+,98o,87o,-QQ+,-AKs,-AKo,-A5s';
+const BTN = '22+,A2s+,K5s+,Q8s+,J8s+,T7s+,97s+,86s+,75s+,65s,54s,A7o+,K9o+,QTo+,JTo';
+const board = (process.argv[2] || 'Ks7d2c').match(/../g).map(E.cardOf);
+let t0 = Date.now();
+const g = E.buildGame({ board, pot: 5.5, stack: 97.5, ranges: [E.parseRange(BB), E.parseRange(BTN)], tree: E.DEFAULT_TREE() });
+console.log('build ms', Date.now() - t0, 'n', g.n, 'decisions', g.decisions.length, 'nodes', g.nodes, 'mem MB', (g.memBytes / 1e6).toFixed(0), 'runouts', g.runouts.size);
+t0 = Date.now(); const s = new E.Solver(g); console.log('alloc ms', Date.now() - t0);
+t0 = Date.now(); s.iterate(1); console.log('first iteration ms', Date.now() - t0);
+t0 = Date.now(); s.iterate(5); console.log('per iteration ms', (Date.now() - t0) / 5);
+t0 = Date.now(); const r = s.evaluate(); console.log('evaluate ms', Date.now() - t0, 'expl % pot', r.exploitPct.toFixed(3));
+const used = process.memoryUsage(); console.log('heap MB', (used.heapUsed / 1e6).toFixed(0), 'arrayBuffers MB', (used.arrayBuffers / 1e6).toFixed(0));

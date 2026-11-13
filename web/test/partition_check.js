@@ -1,0 +1,11 @@
+const E = require('../js/engine.js'), { Driver } = require('../js/partition.js');
+const BB = '22+,A2s+,K2s+,Q4s+,J6s+,T6s+,96s+,85s+,75s+,64s+,53s+,43s,A2o+,K8o+,Q9o+,J9o+,T8o+,98o,87o,-QQ+,-AKs,-AKo,-A5s';
+const BTN = '22+,A2s+,K5s+,Q8s+,J8s+,T7s+,97s+,86s+,75s+,65s,54s,A7o+,K9o+,QTo+,JTo';
+const S = (oop, ip) => ({ oop, ip });
+const tree = { streets: { flop: S({ bet: [] }, { bet: [] }), turn: S({ bet: [50], raise: [] }, { bet: [66], raise: [100], allin: true }), river: S({ bet: [75] }, { bet: [75], allin: true }) }, maxBets: 2, allinThreshold: 0.67, mergeTolerance: 0.1 };
+const cfg = { board: ['Ks','7d','2c','Th'].map(E.cardOf), pot: 20, stack: 90, ranges: [E.parseRange(BB), E.parseRange(BTN)], tree };
+let t0 = Date.now(); const seq = new E.Solver(E.buildGame(cfg)); seq.iterate(30); const a = seq.evaluate(); const tS = Date.now() - t0;
+t0 = Date.now(); const par = new Driver(cfg, 3); par.iterate(30); const b = par.evaluate(); const tP = Date.now() - t0;
+console.log('sequential', a.val[0].toFixed(10), a.expl.toExponential(6), tS + 'ms');
+console.log('partition ', b.val[0].toFixed(10), b.expl.toExponential(6), tP + 'ms');
+console.log('decisions', seq.g.decisions.length);
