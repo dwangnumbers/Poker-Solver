@@ -335,13 +335,15 @@
     this.g = g; this.t = 0;
     this.alpha = opts.alpha == null ? 1.5 : opts.alpha; this.beta = opts.beta == null ? 0 : opts.beta; this.gamma = opts.gamma == null ? 2 : opts.gamma;
     const nmax = Math.max(g.n[0], g.n[1]);
-    const FA = opts.precision === 64 ? Float64Array : Float32Array; this.precision = opts.precision === 64 ? 64 : 32;
+    // storage precision of regrets (R) and strategy sums (S): 32 by default; precisionR / precisionS override each
+    const FR = (opts.precisionR || opts.precision) === 64 ? Float64Array : Float32Array, FS = (opts.precisionS || opts.precision) === 64 ? Float64Array : Float32Array;
+    this.precision = opts.precision === 64 ? 64 : 32;
     // regrets and strategy sums live in a few large blocks; each node holds two views into them
     const CHUNK = 1 << 24; let blockR = null, blockS = null, used = CHUNK;
     let maxA = 1;
     for (const d of g.decisions) {
       const len = g.n[d.p] * d.na;
-      if (used + len > CHUNK) { const sz = Math.max(CHUNK, len); blockR = new FA(sz); blockS = new FA(sz); used = 0; }
+      if (used + len > CHUNK) { const sz = Math.max(CHUNK, len); blockR = new FR(sz); blockS = new FS(sz); used = 0; }
       d.R = blockR.subarray(used, used + len); d.S = blockS.subarray(used, used + len); used += len;
       if (d.na > maxA) maxA = d.na;
     }
@@ -350,7 +352,7 @@
     for (let k = 0; k < depth; k++) this.buf.push({ val: new Float64Array(nmax), act: new Float64Array(nmax * maxA), ro: new Float64Array(nmax), rs: new Float64Array(nmax), sig: new Float64Array(nmax * maxA) });
     this.hist = [];
     // every field is created here so that the object keeps one shape (property additions later deoptimise walk)
-    this.collect = null; this.ext = null; this.partial = false; this._tf = -1; this._dp = 0; this._dn = 0; this._sw = 0;
+    this.collect = null; this.ext = null; this.partial = false; this.zr = false; this.noSkip = false; this._tf = -1; this._dp = 0; this._dn = 0; this._sw = 0;
   }
   /* Layout: every per-node matrix is action-major, entry (hand i, action a) at a * n + i, so the inner loops run over
      contiguous memory. Locks are stored in the same layout. */
@@ -380,6 +382,9 @@
      profile; 3, 4 = coordinator's reach collection with the current (3) or average (4) strategy, no updates */
   Solver.prototype.walk = function (node, p, ro, rs, depth, mode) {
     const g = this.g, B = this.buf[depth], out = B.val, q = 1 - p, np = g.n[p], nq = g.n[q];
+    // zr: the opponent's reach is zero in this whole subtree, so every value is zero; the subtree is still walked in
+    // update modes so that the DCFR discounts and the strategy sums of player p are applied exactly as in plain DCFR
+    if (this.zr && node.t !== 'd' && node.t !== 'c') { out.fill(0, 0, np); return out; }
     if (node.t === 'f') {
       foldMass(g, p, ro, out, null); const pay = node.pay[p];
       for (let i = 0; i < np; i++) out[i] *= pay;
@@ -398,10 +403,13 @@
         const c = cards[ci], dq = wcQ[c], dp = wcP[c];
         for (let j = 0; j < nq; j++) ro2[j] = ro[j];
         for (let k = 0; k < dq.length; k++) ro2[dq[k]] = 0;
-        let any = false; for (let j = 0; j < nq; j++) if (ro2[j] !== 0) { any = true; break; }
-        if (!any) continue;                      // nothing reaches this card: its subtree contributes zero
+        let any = !this.zr && !this.noSkip; if (any) { any = false; for (let j = 0; j < nq; j++) if (ro2[j] !== 0) { any = true; break; } } else any = !this.zr;
         for (let i = 0; i < np; i++) rs2[i] = rs[i];
         for (let k = 0; k < dp.length; k++) rs2[dp[k]] = 0;
+        if (!any) {                              // nothing reaches this card: its subtree contributes zero
+          if (mode === 0 || mode === 3) { const z = this.zr; this.zr = true; this.walk(node.ch[c], p, ro2, rs2, depth + 1, mode); this.zr = z; }
+          continue;
+        }
         const v = this.walk(node.ch[c], p, ro2, rs2, depth + 1, mode);
         for (let k = 0; k < dp.length; k++) v[dp[k]] = 0;
         for (let i = 0; i < np; i++) out[i] += v[i];
@@ -450,6 +458,7 @@
       return out;
     }
     // opponent's node
+    if (this.zr) { for (let a = 0; a < na; a++) this.walk(node.ch[a], p, ro, rs, depth + 1, mode); out.fill(0, 0, np); return out; }
     if (mode === 0 || mode === 3) regretMatch(node, nq, sig, B.ro); else averageStrategy(node, nq, sig, B.ro);
     out.fill(0, 0, np);
     const ro2 = B.ro, acc = B.act;
@@ -457,7 +466,11 @@
     for (let a = 0, o = 0; a < na; a++, o += nq) {
       let any = false;
       for (let j = 0; j < nq; j++) { const x = ro[j] * sig[o + j]; ro2[j] = x; if (x !== 0) any = true; }
-      if (!any) continue;
+      if (this.noSkip) any = true;
+      if (!any) {
+        if (mode === 0 || mode === 3) { this.zr = true; this.walk(node.ch[a], p, ro2, rs, depth + 1, mode); this.zr = false; }
+        continue;
+      }
       const v = this.walk(node.ch[a], p, ro2, rs, depth + 1, mode);
       for (let i = 0; i < np; i++) acc[i] += v[i];
     }
