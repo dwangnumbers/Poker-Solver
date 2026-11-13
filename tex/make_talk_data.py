@@ -418,8 +418,8 @@ if cp:
         e_in = np.median(np.abs(pred[m] - y[m]) / y[m]); e_lo = np.median(np.abs(X[m] @ cl - y[m]) / y[m])
         ins.append(e_in); loos.append((t["name"], e_lo))
         spread.append((np.max(y[m]) - np.min(y[m])) / np.median(y[m]))
-        rows.append([t["name"], f"{t['decisions']:,}", f"{np.median(y[m]):.0f}", f"{np.median(pred[m]):.0f}", f"{100 * e_lo:.0f}\\%"])
-    table("cost_table", ["tree", "decisions", "measured", "model", "held-out error"], rows, "lrrrr")
+        rows.append([t["name"], f"{t['decisions']:,}", f"{np.median(y[m]):.0f}", f"{np.median(pred[m]):.0f}", f"{100 * e_lo:.0f}"])
+    table("cost_table", ["tree", "decisions", "measured", "model", "held out, \\%"], rows, "lrrrr")
     mac("CostA", f"{1e6 * coef[0]:.0f}"); mac("CostB", f"{1e6 * coef[1]:.0f}"); mac("CostTrees", str(len(cp)))
     mac("CostPairs", str(len(rows_)))
     fl = [e for nm, e in loos if nm.startswith("flop")]

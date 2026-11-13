@@ -525,7 +525,7 @@ Zero-reach shortcut & traversal without shortcut & regrets and sums bit for bit 
 Leaf evaluation & direct $O(n^2)$ sums & agreement to $10^{-12}$ \\ \bottomrule
 \end{tabular}
 \note{
-Most components have an independent check. The two LP tests build the game separately in Python with explicit chance nodes and solve
+Most components have an independent check. The three LP tests build the game separately in Python with explicit chance nodes and solve
 the sequence-form LP exactly, so they test chance weighting, card removal and showdowns together; the remaining differences, $6\times10^{-8}$
 and $1\times10^{-5}$, are within the exploitability left after 20{,}000 and 10{,}000 DCFR iterations. The river row checks the new engine
 against the earlier implementation of the same algorithm: equal iterates, not an independent method. The mid-size turn LP, with 40 and
