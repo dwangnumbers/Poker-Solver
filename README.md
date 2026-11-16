@@ -42,7 +42,7 @@ live demonstration. The earlier deck on the second-order finish is `tex/talk-new
 ```
 python3 web/build.py                 # site into docs/
 node web/test/turn_check.js          # one of the tests
-bash web/experiments/run_all.sh      # all experiments (about an hour on two cores)
+bash web/experiments/run_all.sh      # all experiments (about six hours on two cores)
 python3 tex/make_talk_data.py        # figures and tables, then pdflatex tex/talk.tex
 ```
 

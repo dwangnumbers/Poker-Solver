@@ -5,6 +5,7 @@
 \usepackage[most]{tcolorbox}
 \usepackage[colorlinks,linkcolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
 \graphicspath{{../figs/}}
+\input{../tex/data/numbers2.tex}
 \setlength{\parskip}{5pt}\setlength{\parindent}{0pt}
 \newcommand{\SP}{\ensuremath{\spadesuit}}\newcommand{\HE}{\ensuremath{\heartsuit}}
 \newcommand{\DI}{\ensuremath{\diamondsuit}}\newcommand{\CL}{\ensuremath{\clubsuit}}
@@ -667,7 +668,7 @@ plans (\Lem{lem:seqbilinear}) and the average is taken over plans (\Def{def:avg}
 \st Bound: $195\cdot2.7\times10^7\cdot\sqrt3/\sqrt{10^4}\approx9\times10^7$ chips, for a pot of 5.5 chips.
 \by{\Thm{thm:cfr}}
 \st So the theorem guarantees convergence, but says nothing useful about speed. The talk \emph{measures} speed
-instead (\S\ref{sec:conv}): about 70 iterations reach 0.3\% of the pot.
+instead (\S\ref{sec:conv}): on 20 random flops the median is \SampFlopOneMed\ iterations to 0.3\% of the pot.
 \end{example}
 
 % ============================================================================
@@ -1054,6 +1055,15 @@ showdowns add about 29\%; the total is about 2.3 s against 2.3 s measured.
 \begin{center}\input{../tex/data/cost_table.tex}\end{center}
 The model \emph{accounts} for time rather than predicting it in advance: $W_{\text{show}}$ is counted during the run.
 
+\begin{example}[How many observations does the fit really have?]\label{ex:cluster}
+\steps
+\st The fit uses \CostPairs\ timed iterations, but iterations of one tree have nearly the same work and time: they are close to
+repeated measurements of one tree. The fit really rests on \CostTrees\ trees.
+\st That is why the errors are reported per held-out \emph{tree} (\Ex{ex:ls}, Step 3), not per iteration.
+\st As a further check, \CostOOSN\ new trees on random boards, never used in the fit, were timed: the median error is \CostOOSMed\ and
+the largest \CostOOSMax. By kind: \CostOOSDesc.
+\end{example}
+
 % ============================================================================
 \section{Memory}\slide{13}
 \begin{lemma}[Memory]\label{lem:mem}
@@ -1181,12 +1191,108 @@ times less error would need 100 times more iterations.
 \st Iterations to reach a target $\varepsilon$: solve $CT^{-k}=\varepsilon$, so $T=(C/\varepsilon)^{1/k}$.
 \end{example}
 \begin{center}\includegraphics[width=\linewidth]{conv_streets.pdf}\end{center}
-Measured end-of-run slopes: about $-1$ for CFR, $-1.4$ to $-1.7$ for CFR$^+$, $-1.4$ to $-2.1$ for DCFR, all far better than the
-proven $-\tfrac12$. They are measured over a window, not proven rates. Median iterations to 0.3\% of the pot: river 95,
-turn 170, flop 71.
-\begin{center}\input{../tex/data/tol_table.tex}\qquad\input{../tex/data/treesize_table.tex}\end{center}
-The count depends on the betting structure, not the node count: 8 and 789 decision nodes both need 40 iterations, so the
-cost per iteration (\S\ref{sec:cost}) decides the running time.
+These three curves are single example spots. Their end-of-run slopes (about $-1$ for CFR, $-1.4$ to $-1.7$ for CFR$^+$, $-1.4$ to
+$-2.1$ for DCFR) are local rates over a stated window, not proven rates, and they change when the window changes. The general
+statements of the talk rest instead on a sample of random boards, which needs a little statistics.
+
+\subsection*{From a few spots to a population}
+\begin{definition}[The population of spots]\label{def:popspot}
+DCFR is deterministic: one spot always gives the same iteration count $f(\text{spot})$. The variation is between spots. A
+\emph{random spot} $S$ is a board dealt uniformly from the deck, with fixed ranges (the big blind's call and the button's open)
+and a fixed betting menu: ``one size'' (every player may check or bet 75\% of the pot on every street, no raises) or ``two sizes,
+raise'' (bets of 33\% and 75\%, a raise of 50\%). A statement such as ``flops need about 100 iterations'' is a statement about the
+distribution of $X=f(S)$. A sample is $n$ independent draws $X_1,\dots,X_n$.
+\end{definition}
+Dealing flops uniformly gives each of the 1755 distinct flops a probability proportional to its orbit size (\Lem{lem:orbstab}),
+because every one of the $22{,}100$ actual flops is equally likely.
+
+\begin{definition}[Order statistics, median]\label{def:order}
+Sorting the sample gives $X_{(1)}\le X_{(2)}\le\dots\le X_{(n)}$. A \emph{median} of $X$ is a number $m$ with $P(X\le m)\ge\frac12$
+and $P(X\ge m)\ge\frac12$; for a continuous distribution $P(X<m)=P(X>m)=\frac12$.
+\end{definition}
+
+\begin{lemma}[A confidence interval for the median]\label{lem:medci}
+Let $X$ be continuous with median $m$, and let $B$ be binomial with $n$ trials and success probability $\frac12$. Then for $j\le n/2$,
+\[ P\big(X_{(j)}\le m\le X_{(n+1-j)}\big)=1-2P(B\le j-1). \]
+\end{lemma}
+\begin{proof}
+Let $B$ be the number of draws below $m$. Each draw is below $m$ with probability $\frac12$, independently, so $B$ is binomial
+$(n,\frac12)$. The interval misses $m$ on the left exactly when $X_{(j)}>m$, that is, when fewer than $j$ draws are below $m$:
+$B\le j-1$. It misses on the right exactly when $X_{(n+1-j)}<m$, that is, when at least $n+1-j$ draws are below $m$:
+$B\ge n+1-j$, which by symmetry of $B$ has the same probability as $B\le j-1$. The two events are disjoint, so the miss probability
+is $2P(B\le j-1)$.
+\end{proof}
+
+\begin{example}[The interval for 20 flops]\label{ex:medci}
+\steps
+\st $n=20$. $P(B\le5)=\frac{1}{2^{20}}\sum_{i=0}^{5}\binom{20}{i}=\frac{1+20+190+1140+4845+15504}{1048576}=\frac{21700}{1048576}\approx0.0207$.
+\by{\Lem{lem:medci}}
+\st So $[X_{(6)},X_{(15)}]$ contains the median with probability $1-2\cdot0.0207\approx0.959$, at least 95\%.
+\st Taking $j=7$ would give $1-2P(B\le6)\approx1-2\cdot0.0577=0.885$, below 95\%. So $j=6$ is the narrowest choice.
+\st For the river and turn samples the same computation gives $[X_{(18)},X_{(33)}]$ for $n=50$, $[X_{(14)},X_{(27)}]$ for $n=40$ and
+$[X_{(10)},X_{(21)}]$ for $n=30$.
+\st Nothing here assumes a normal distribution: the interval is \emph{distribution-free}. Iteration counts are integers, so ties
+are possible; they only make the interval slightly conservative.
+\end{example}
+
+\begin{lemma}[An upper tolerance bound from the maximum]\label{lem:tol}
+For $0<p<1$ let $q_p$ be the $p$-quantile of $X$ ($P(X\le q_p)=p$). Then $P(X_{(n)}\ge q_p)=1-p^n$. Choosing $p=0.05^{1/n}$: with
+probability 95\%, at least a fraction $p$ of all spots need at most $X_{(n)}$ iterations.
+\end{lemma}
+\begin{proof}
+$X_{(n)}<q_p$ means that all $n$ independent draws are below $q_p$, which has probability $p^n$. With $p=0.05^{1/n}$ this is
+$0.05$.
+\end{proof}
+\textbf{Numbers:} $n=20$ gives $p=0.05^{1/20}\approx0.861$; $n=50$ gives $0.942$.
+
+\begin{definition}[Sign test]\label{def:sign}
+For paired counts $(a_i,b_i)$ on the same boards (for example DCFR and CFR$^+$), count the boards with $a_i<b_i$ ($w$) and with
+$a_i>b_i$ ($l$), dropping ties. If neither method were faster, each untied board would go either way with probability $\frac12$.
+The two-sided \emph{p-value} is $2P(B\le\min(w,l))$ with $B$ binomial $(w+l,\frac12)$.
+\end{definition}
+
+\begin{example}[A sign test by hand]\label{ex:sign}
+\steps
+\st Suppose DCFR is faster on all 10 of 10 untied boards: $w=10$, $l=0$. \by{\Def{def:sign}}
+\st $P(B\le0)=2^{-10}\approx0.001$, so $p\approx0.002$. If the methods were equally fast, a 10--0 split would happen about twice in
+a thousand experiments.
+\st With 8--2: $P(B\le2)=\frac{1+10+45}{1024}\approx0.055$, $p\approx0.11$. Not convincing on its own.
+\end{example}
+
+\subsection*{The results}
+\begin{center}\footnotesize\setlength\tabcolsep{4pt}\input{../tex/data/sample_table.tex}\end{center}
+Median iterations, with the 95\% interval of \Lem{lem:medci}, and the largest count in the sample. Exploitability is evaluated
+every iteration up to 20 and then 5\% apart, so a count overstates the true crossing by at most 5\%.
+\begin{center}\includegraphics[width=0.62\linewidth]{sample_iters.pdf}\end{center}
+
+\begin{example}[Reading the table]\label{ex:readsample}
+\steps
+\st Flops, one size: the median is \SampFlopOneMed\ iterations to 0.3\%, and $[X_{(6)},X_{(15)}]=$ \SampFlopOneCI\ is a
+\SampFlopOneCov\ interval for the median of all flops. \by{\Lem{lem:medci}}
+\st The largest flop count is \SampFlopOneMax. With 95\% confidence, at least \SampFlopOneTol\ of all flops need at most that many.
+\by{\Lem{lem:tol}}
+\st On the same river and turn boards, the second menu multiplies the count by \SampRiverTreeRatio\ (river) and \SampTurnTreeRatio\
+(turn) in the median. Since the boards are paired, the difference is caused by the betting, not by the boards. With the
+same menu, each further street of betting multiplies the median by two to three (\SampRiverOneMed, \SampTurnOneMed,
+\SampFlopOneMed). The old example spots suggested the opposite order (flop 71, turn 170) only because they used different
+trees on different streets.
+\by{\Def{def:sign}}
+\st Against CFR$^+$, DCFR was faster on \SampRiverOneVsPlus\ river and \SampTurnOneVsPlus\ turn boards (sign test
+\SampRiverOneVsPlusP\ and \SampTurnOneVsPlusP). \by{\Def{def:sign}}
+\st Scope: one pair of ranges and two betting menus. Other ranges or deeper trees are outside the population of
+\Def{def:popspot}, and nothing here is a theorem about DCFR; the proven rate is still \Thm{thm:dcfr}.
+\end{example}
+\begin{center}\small\input{../tex/data/algo_table.tex}\end{center}
+
+\begin{remark}[Slopes]\label{rem:slopes}
+A slope is fitted over a window. On the random flops, fitting between the first checkpoints below 1\% and below 0.1\% gives a
+median DCFR slope of \SampFlopOneSlope; fitting between 3\% and 0.3\% gives \SampFlopOneSlopeAlt. Different windows, different
+numbers: the curves are not exact power laws, so a slope describes the stretch of the run it was fitted on.
+\end{remark}
+
+On one fixed flop, trees of very different size need the same number of iterations when the betting is the same:
+\begin{center}\input{../tex/data/treesize_table.tex}\end{center}
+So the cost per iteration (\S\ref{sec:cost}) decides the running time.
 
 % ============================================================================
 \section{Validation by linear programming}\label{sec:valid}\slide{18}

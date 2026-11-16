@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Every measurement of the talk, in sequence (about three hours on two cores). Results in out/*.json, logs in out/*.log.
+# Every measurement of the talk, in sequence (about six hours on two cores). Results in out/*.json, logs in out/*.log.
 # Timing experiments run last so that nothing else competes for the processors.
 set -e
 cd "$(dirname "$0")"
@@ -18,6 +18,7 @@ node conv.js river 2000 1 > out/conv_river.log 2>&1
 node conv.js turn 600 1 > out/conv_turn.log 2>&1
 node conv.js flop 150 1 > out/conv_flop.log 2>&1
 for s in river turn flop flopsize; do node convspots.js $s > out/convspots_$s.log 2>&1; done
+./runS.sh                                                                   # random-board study, about three hours
 node precbase.js > out/precbase.log 2>&1
 node perturb.js > out/perturb.log 2>&1
 node flatdir.js > out/flatdir.log 2>&1
@@ -31,6 +32,7 @@ node roofline.js > out/roofline.log 2>&1
 node leafcost.js > out/leafcost.log 2>&1
 node scaling.js > out/scaling.log 2>&1
 node costpairs.js > out/costpairs.log 2>&1
+node costcheck.js > out/costcheck.log 2>&1                                 # cost model on new random-board trees
 node parallel.js > out/parallel.log 2>&1
 
 python3 parallel_browser.py > out/parallel_browser.log 2>&1   # needs docs/ served on port 8765

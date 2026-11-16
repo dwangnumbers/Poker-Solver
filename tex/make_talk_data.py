@@ -422,6 +422,17 @@ if cp:
     table("cost_table", ["tree", "decisions", "measured", "model", "held out, \\%"], rows, "lrrrr")
     mac("CostA", f"{1e6 * coef[0]:.0f}"); mac("CostB", f"{1e6 * coef[1]:.0f}"); mac("CostTrees", str(len(cp)))
     mac("CostPairs", str(len(rows_)))
+
+    # out of sample: new trees on random boards (costcheck.js), predicted with the constants fitted above
+    cc = load("costcheck")
+    if cc:
+        errs, kinds = [], {}
+        for t in cc:
+            rr = t["rows"][2:]
+            pr_ = np.array([coef[0] * t["work"] + coef[1] * r["show"] for r in rr]); yy = np.array([r["ms"] for r in rr])
+            e = float(np.median(np.abs(pr_ - yy) / yy)); errs.append(e); kinds.setdefault(t["name"], []).append(e)
+        mac("CostOOSN", str(len(cc))); mac("CostOOSMed", f"{100 * np.median(errs):.0f}\\%"); mac("CostOOSMax", f"{100 * max(errs):.0f}\\%")
+        mac("CostOOSDesc", ", ".join(f"{len(v)} {k} (median error {100 * np.median(v):.0f}\\%)" for k, v in kinds.items()))
     fl = [e for nm, e in loos if nm.startswith("flop")]
     mac("CostLooFlop", f"{100 * max(fl):.0f}\\%"); mac("CostLooAll", f"{100 * max(e for _, e in loos):.0f}\\%")
     big2 = [e for nm, e in loos if nm in ("flop, 1 size per street", "flop, standard")]
@@ -527,11 +538,134 @@ if tm:
     mac("TurnMidLP", f"{tm['lp']:.8f}"); mac("TurnMidJS", f"{tm['js'][-1]['value0']:.8f}"); mac("TurnMidHands", f"{tm['hands'][0]} and {tm['hands'][1]}")
     mac("TurnMidDiff", "$" + sci(abs(tm['lp'] - tm['js'][-1]['value0']), 0) + "$"); mac("TurnMidExpl", "$" + sci(tm['js'][-1]['expl'], 0) + "$")
 
+
+# =====================================================================================  random-board study (sample.js)
+from math import comb
+
+
+def binom_cdf(k, n):
+    return sum(comb(n, i) for i in range(k + 1)) / 2 ** n
+
+
+def median_ci(v):
+    """distribution-free confidence interval for the median from order statistics, and its exact coverage"""
+    v = sorted(v); n = len(v); j = 0
+    while j + 1 <= n // 2 and binom_cdf(j, n) <= 0.025:
+        j += 1
+    # order statistics x_(j) and x_(n+1-j), 1-based
+    return v[j - 1], v[n - j], 1 - 2 * binom_cdf(j - 1, n)
+
+
+def sign_test(a, b):
+    """two-sided sign test of a < b against a > b over pairs (ties dropped): wins, losses, p-value"""
+    w = sum(1 for x, y in zip(a, b) if x < y); l = sum(1 for x, y in zip(a, b) if x > y); n = w + l
+    p = min(1.0, 2 * binom_cdf(min(w, l), n)) if n else 1.0
+    return w, l, p
+
+
+def pfmt(p):
+    return "$p<10^{-6}$" if p < 1e-6 else f"$p={sci(p, 0)}$" if p < 0.01 else f"$p={p:.2f}$"
+
+
+def load_sample(street, st):
+    d = load(f"sample_{street}_{st}")
+    if d is None:
+        parts = [load(f"sample_{street}_{st}_{a}-{b}") for a, b in ((0, 10), (10, 20))]
+        if not all(parts):
+            return None
+        d = dict(parts[0]); d["res"] = parts[0]["res"] + parts[1]["res"]
+    return d
+
+
+def window_slope(pts, hi, lo):
+    """least-squares slope of log(expl) on log(T) over the checkpoints from the first one at or below hi to the first one at or below lo"""
+    i0 = next((i for i, p in enumerate(pts) if p[1] <= hi), None); i1 = next((i for i, p in enumerate(pts) if p[1] <= lo), None)
+    if i0 is None or i1 is None or i1 - i0 < 3:
+        return None
+    q = pts[i0:i1 + 1]
+    return float(np.polyfit(np.log([p[0] for p in q]), np.log([p[1] for p in q]), 1)[0])
+
+
+groups = [("river", "S1"), ("river", "S2"), ("turn", "S1"), ("turn", "S2"), ("flop", "S1")]
+SD = {g: load_sample(*g) for g in groups}
+INF = 10 ** 9
+if any(SD.values()):
+    rows, fig_data = [], []
+    for g in groups:
+        d = SD[g]
+        if not d or len(d["res"]) < 6:
+            continue
+        runs = [r["runs"]["DCFR"] for r in d["res"]]
+        n = len(runs); cells = [g[0], {"S1": "one size", "S2": "two sizes, raise"}[g[1]], str(n),
+                                f"{int(np.median([r['decisions'] for r in d['res']])):,}"]
+        for t in ("1", "0.3", "0.1"):
+            v = [r["hit"].get(t, INF) for r in runs]
+            lo, hi, cov = median_ci(v)
+            med = np.median(v)
+            cells.append(f"{med:.0f} [{lo}, {hi}]" if max(v) < INF else f"{med:.0f} [{lo}, --]")
+        v3 = [r["hit"].get("0.3", INF) for r in runs]
+        cells.append(str(max(v3)) if max(v3) < INF else "not reached")
+        rows.append(cells); fig_data.append((g, v3))
+        key = g[0].capitalize() + {"S1": "One", "S2": "Two"}[g[1]]
+        mac(f"Samp{key}N", str(n)); mac(f"Samp{key}Med", f"{np.median(v3):.0f}"); mac(f"Samp{key}Max", str(max(v3)))
+        mac(f"Samp{key}Tol", f"{100 * 0.05 ** (1 / n):.0f}\\%")
+        lo, hi, cov = median_ci(v3); mac(f"Samp{key}CI", f"{lo}--{hi}"); mac(f"Samp{key}Cov", f"{100 * cov:.0f}\\%")
+        sl = [window_slope(r["pts"], 1, 0.1) for r in runs]; sl = [x for x in sl if x is not None]
+        sl2 = [window_slope(r["pts"], 3, 0.3) for r in runs]; sl2 = [x for x in sl2 if x is not None]
+        if sl:
+            q1, q2, q3 = np.percentile(sl, [25, 50, 75])
+            mac(f"Samp{key}Slope", f"${q2:.1f}$ (quartiles ${q1:.1f}$ and ${q3:.1f}$)")
+        if sl2:
+            mac(f"Samp{key}SlopeAlt", f"${np.median(sl2):.1f}$")
+    table("sample_table", ["street", "betting", "boards", "decisions", "to 1\\%", "to 0.3\\%", "to 0.1\\%", "max to 0.3\\%"], rows, "llrrrrrr")
+
+    # figure: iterations to 0.3% for every board
+    fig, ax = plt.subplots(figsize=(4.6, 2.2))
+    rs = np.random.default_rng(0)
+    for i, (g, v) in enumerate(fig_data):
+        c = "#1BAF7A" if g[1] == "S1" else "#2A78D6"
+        ax.scatter(i + rs.uniform(-0.18, 0.18, len(v)), v, s=9, color=c, alpha=0.75, linewidths=0)
+        ax.plot([i - 0.3, i + 0.3], [np.median(v)] * 2, color="#0B0B0B", lw=1.4)
+    ax.set_xticks(range(len(fig_data)))
+    ax.set_xticklabels([f"{g[0]}\n{'one size' if g[1] == 'S1' else 'two sizes'}" for g, _ in fig_data], fontsize=8)
+    ax.set_yscale("log"); ax.set_ylabel("iterations to 0.3% of pot"); ax.grid(axis="x", visible=False)
+    fig.tight_layout(); fig.savefig(figs / "sample_iters.pdf"); plt.close(fig)
+
+    # paired comparisons: algorithms and betting structures
+    def counts(d, a, t="0.3"):
+        return [r["runs"][a]["hit"].get(t, INF) for r in d["res"]]
+    comp = []
+    for g in (("river", "S1"), ("river", "S2"), ("turn", "S1")):
+        d = SD[g]
+        if d and "CFR+" in d["res"][0]["runs"]:
+            key = g[0].capitalize() + {"S1": "One", "S2": "Two"}[g[1]]
+            w, l, p = sign_test(counts(d, "DCFR"), counts(d, "CFR+"))
+            mac(f"Samp{key}VsPlus", f"{w} of {len(d['res'])}"); mac(f"Samp{key}VsPlusP", pfmt(p))
+            w2, l2, p2 = sign_test(counts(d, "DCFR"), counts(d, "CFR"))
+            mac(f"Samp{key}VsCFR", f"{w2} of {len(d['res'])}"); mac(f"Samp{key}VsCFRP", pfmt(p2))
+            ratio = np.median([b / a for a, b in zip(counts(d, "DCFR"), counts(d, "CFR+")) if b < INF])
+            mac(f"Samp{key}PlusRatio", f"{ratio:.1f}")
+            comp.append([f"{g[0]}, {'one size' if g[1] == 'S1' else 'two sizes'}", str(len(d["res"])),
+                         f"{np.median(counts(d, 'DCFR')):.0f}", f"{np.median(counts(d, 'CFR+')):.0f}",
+                         f"{np.median(counts(d, 'CFR')):.0f}" if np.median(counts(d, 'CFR')) < INF else "--",
+                         f"{w}/{l}", pfmt(p)])
+    if comp:
+        table("algo_table", ["spots", "boards", "DCFR", "CFR$^+$", "CFR", "DCFR faster/slower than CFR$^+$", "sign test"], comp, "lrrrrrr")
+    for street in ("river", "turn"):
+        a, b = SD.get((street, "S1")), SD.get((street, "S2"))
+        if a and b and len(b["res"]) >= 6 and len(a["res"]) >= len(b["res"]):
+            m = len(b["res"])
+            x1, x2 = counts(a, "DCFR")[:m], counts(b, "DCFR")
+            w, l, p = sign_test(x1, x2)
+            key = street.capitalize()
+            mac(f"Samp{key}TreeRatio", f"{np.median([y / x for x, y in zip(x1, x2)]):.1f}")
+            mac(f"Samp{key}TreeWins", f"{w} of {m}"); mac(f"Samp{key}TreeP", pfmt(p))
+
 # placeholders for anything still missing, so that the deck compiles
 needed = ["TurnMidLP", "TurnMidJS", "TurnMidHands", "TurnMidDiff", "TurnMidExpl", "CondDist", "CondExplHi", "CondExplLo", "CostPairs", "CostLooFlop", "CostLooAll", "CostIterSpread", "ParIqr", "CostSpread", "FlopShowEval", "PertDist", "FlatClear", "FlatIndiff", "CostLoo", "MemEstErr", "PrecBase", "ParOvFlop", "ParOvTurn", "MultiTwenty", "ReportTol", "FlopLeafShare", "ParEff", "ParNodeOverhead", "FlopInfosets", "CostA", "CostB", "CostTrees", "CostResid", "FlopShowLeaves", "RoofUpdNs", "RoofCopyGBs", "RoofRatio",
           "PrecFloor", "PrecDiff", "ParCores", "ParBytes", "ParAgree", "ParPredEight", "RiverOldNew", "RiverOldOld", "TurnLP", "TurnJS", "TurnHands",
           "FlopLP", "FlopJS", "FlopHands", "LockItBefore", "LockItAfter", "LockValAfter", "LockValBefore", "LockFoldAfter", "LockFoldBefore",
-          "LockBetBefore", "SensRms", "SensMax", "LowRankErr", "DDensity", "ConvSlopes", "LeafErr"]
+          "LockBetBefore", "CostOOSN", "CostOOSMed", "CostOOSMax", "CostOOSDesc", "SensRms", "SensMax", "LowRankErr", "DDensity", "ConvSlopes", "LeafErr"]
 for k in needed:
     macros.setdefault(k, "??")
 for t in ("tol_table", "cost_table", "sens_table", "report_table", "treesize_table"):

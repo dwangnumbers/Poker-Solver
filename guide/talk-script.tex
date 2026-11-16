@@ -292,6 +292,10 @@ other seven, and predict the one left out. On the two large flop trees the error
 smallest trees it is up to thirty percent, where an iteration takes a few milliseconds and timing noise is large.
 The model also under-predicts trees dominated by leaves, so some per-leaf overhead is missing from it.
 
+Two honest remarks. The 252 iterations are not 252 independent data points: iterations of one tree are almost repeats, so
+the fit really rests on eight trees, and that is why I report errors per held-out tree. And as a fresh test, I timed 22
+new trees on random boards that the fit never saw. The median error there is 8 percent, the largest 20.
+
 What you should take from this slide: time per iteration is proportional to the size of the tree, about two to
 three seconds for these flop trees on one core. And adding a bet size multiplies the tree, because the new branch
 carries its own copy of everything below it.
@@ -362,32 +366,42 @@ are added in a different order. They agree to fourteen digits.
 \begin{say}
 We know what one iteration costs. How many do we need?
 
-These plots show exploitability against iterations, on logarithmic axes, for a river, a turn and a flop problem.
-Blue is plain CFR, orange is CFR-plus, green is discounted CFR. The dashed line is the 0.3 percent target.
+These plots show exploitability against iterations, on logarithmic axes, for one river, one turn and one flop
+problem. Blue is plain CFR, orange is CFR-plus, green is discounted CFR. The dashed line is the 0.3 percent target.
+
+Three curves are an illustration, not evidence. The evidence is in the sentence below the plots. I drew 50 river
+boards and 40 turn boards at random and solved each with all three methods. Discounted CFR reached the target before
+CFR-plus on 49 of the 50 river boards and on all 40 turn boards, and before CFR on every board. If the methods were
+equally fast, that split would be a one-in-a-million event.
 
 On a log-log plot a straight line of slope minus k means the error behaves like one over T to the k. The theorem
-promised slope minus one half. What we measure at the end of these runs is about minus one for CFR, and between
-minus 1.4 and minus 2.1 for discounted CFR. On the flop after 150 iterations, CFR is at 1.6 percent of the pot and
-discounted CFR is at 0.05 percent.
-
-Two cautions. These are slopes over a finite window, not proven rates. And nobody can currently explain why the
-method beats its own worst-case bound by this much. That is an open problem.
+promised slope minus one half. Fitted between 1 and 0.1 percent of the pot, discounted CFR has slope about minus 1.9
+on the random flops. But a slope belongs to the window it is fitted on: a different window gives a different number.
+So these are local rates, not proven ones, and nobody can currently explain why the method beats its worst-case
+bound by this much. That is an open problem.
 \end{say}
 
 \slidehead{17}{Iterations to a fixed accuracy}{2 min}
 \begin{say}
-One problem per street is thin evidence, so here are thirteen: five river, five turn, three flop. The table gives
-the median number of iterations to reach each accuracy, with the range.
+Since the algorithm is deterministic, the only randomness is in which spot you solve. So a claim like ``flops
+take about a hundred iterations'' is a claim about a population of spots, and I treat it that way.
 
-To reach 0.3 percent: about 95 on the river, 170 on the turn, 71 on the flop. Between different boards the count
-varies by less than a factor of two.
+I dealt boards uniformly at random: 50 rivers, 40 turns and 20 flops, the same ranges throughout, and the same
+betting menu on every street, one bet size of three quarters of the pot. On the river and turn I also solved the
+same boards with a richer menu: two sizes and a raise. Every board drawn was solved; nothing was thrown out.
 
-The lower table fixes one flop and changes the tree. The first two trees differ by a factor of a hundred in size and
-need the same forty iterations. What increases the count is more betting options, not more nodes.
+The table gives the median iterations to each accuracy and, in brackets, a 95 percent confidence interval for the
+median. It comes from order statistics, so it assumes nothing about the shape of the distribution. To reach 0.3
+percent: 16 on the river, 47 on the turn and 97 on the flop with one size, and the flop interval is 92 to 102.
 
-This is the conclusion that organizes the whole talk. The number of iterations is roughly constant, a hundred or
-two. The cost per iteration ranges over three orders of magnitude from river to flop. So the cost per iteration
-decides the running time, and that is why I spent so long on it.
+Two findings. First, the count grows with the amount of betting. On the same boards, a second size and a raise
+multiply it by about two and a half to three, and each extra street of betting by two to three. Second, the
+spread between boards is small: the largest flop needed 126. With 95 percent confidence, at least 86 percent of all
+flops need no more than that.
+
+This is the conclusion that organizes the whole talk. The iteration count grows with the betting, but stays in the
+tens to low hundreds. The cost per iteration grows with the whole tree, by three orders of magnitude from river to
+flop. So the cost per iteration decides the running time, and that is why I spent so long on it.
 \end{say}
 
 \slidehead{18}{Validation}{2 min}
@@ -588,7 +602,8 @@ exactly. A realistic six-player game stalls at a few hundredths of a big blind. 
 
 \slidehead{26}{Limitations}{0.5 min}
 \begin{say}
-The limitations, plainly. It is slow next to commercial solvers. The fast convergence has no theory. The preflop
+The limitations, plainly. It is slow next to commercial solvers. The fast convergence has no theory, and the
+iteration counts are measured for one pair of ranges and two betting menus. The preflop
 model ignores later betting. Parallel scaling is measured on two cores only. And the flop solver has not yet been
 compared with an established solver on a full-size tree; my exact checks go up to 40 hands per player.
 \end{say}
@@ -610,7 +625,8 @@ and a sorted sweep make every leaf linear in place of quadratic.
 What makes it trustworthy is measurement. A cost model tested on held-out trees, a precision experiment with a
 control, a parallel version checked against the sequential one, and exact solutions to compare with.
 
-And the number of iterations is about the same everywhere, so the cost of one iteration is what decides everything.
+And on random boards the number of iterations stays in the tens to low hundreds, so the cost of one iteration is
+what decides everything.
 
 The site, the code and every experiment are at the address on the slide. Thank you. I am happy to take questions.
 \end{say}
@@ -624,6 +640,11 @@ have a dense five-hundred by five-hundred block at each of about seventy thousan
 only needs products with the matrix, and the tree walk computes those without forming it.''
 \item[Why does DCFR beat its bound by so much?] ``Nobody knows. The bound is a worst case over all games. Poker
 trees clearly have more structure. It is an open problem and I list it under next steps.''
+\item[How general are your iteration counts?] ``They are medians over boards dealt uniformly at random, with
+distribution-free confidence intervals, for one pair of ranges and two betting menus. Within that population they are solid; for
+other ranges or much richer trees I have not sampled, and I would not extrapolate.''
+\item[Why a sign test and not a t-test?] ``The counts are skewed integers with ties, and the sign test only uses which method was
+faster on each board, so it needs no distributional assumption.''
 \item[Is the last strategy or the average the answer?] ``The average. The current strategy keeps moving; the
 weighted average is what converges and what the theorem is about.''
 \item[How does this compare with PioSolver in speed?] ``Much slower: seconds per flop iteration against a small

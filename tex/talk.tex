@@ -178,7 +178,7 @@ The unknowns are an action distribution for every hand at every decision node.
 \note{
 The running example is the most common spot in online poker: the button opens, the big blind calls, and the flop is
 K$\spadesuit$ 7$\diamondsuit$ 2$\clubsuit$. The big blind has 488 hands and the button 460 that avoid the board.\\[3pt]
-The table gives the spots of the convergence study, one tree per street. A river spot has a few dozen decision nodes; a flop spot
+The table gives the example trees, one per street. A river tree has a few dozen decision nodes; a flop tree
 with one bet size per street has tens of thousands, because every turn and river card opens a new copy of the later streets.
 }
 \end{frame}
@@ -359,8 +359,8 @@ absorbed into $a$ and $b$.
 \begin{columns}[T]
 \column{0.42\textwidth}
 \small Times are median milliseconds per iteration on one core. A fit to \CostPairs\ timed iterations of \CostTrees\ trees gives $a=\CostA$ and $b=\CostB$ ns. Predicted from
-the other trees, the median error is \CostLoo\ on the two largest flop trees and at most \CostLooAll. The model
-under-predicts leaf-dominated trees, so it misses some per-leaf overhead.
+the other trees, the median error is \CostLoo\ on the two largest flop trees and at most \CostLooAll. On \CostOOSN\ new trees on
+random boards, never used in the fit, the median error is \CostOOSMed\ and the largest \CostOOSMax.
 \column{0.56\textwidth}
 \centering
 {\footnotesize\setlength\tabcolsep{2.5pt}\input{data/cost_table.tex}}
@@ -369,7 +369,10 @@ under-predicts leaf-dominated trees, so it misses some per-leaf overhead.
 Each iteration is timed together with the work counted in the same iteration, over the first 14 to 60 iterations of a solve; the first two
 iterations of each tree (compilation, first sorts) are left out. The cost depends on the iterate, because subtrees that the opponent does
 not reach skip their leaves, and individual iterations of one tree vary by up to \CostIterSpread\ (garbage collection, compilation and the
-changing reach). The model accounts for the time; it does not predict it in advance, since $W_{\mathrm{show}}$ is measured by running.\\[3pt]
+changing reach). The model accounts for the time; it does not predict it in advance, since $W_{\mathrm{show}}$ is measured by running.
+The \CostPairs\ iterations are not independent observations: iterations of one tree are close to repeated measurements, so the fit rests
+on \CostTrees\ trees, which is why the errors are reported per held-out tree. The new trees are \CostOOSDesc; the model under-predicts
+leaf-dominated trees, so it misses some per-leaf overhead.\\[3pt]
 Fitting separate fold, chance and decision constants is ill-posed because these counts are nearly collinear across trees, so $a$ includes
 the fold and chance work. On the flop tree the showdowns take about \FlopLeafShare\ of the time. The bare DCFR update loop in the same
 runtime costs \RoofUpdNs\ ns per entry; the remainder of $a$ is the rest of the traversal (regret matching, reach products, folds,
@@ -473,38 +476,50 @@ eight-worker figure is an extrapolation of the model, not a measurement. In the 
 \centering
 \includegraphics[width=\linewidth]{conv_streets.pdf}\\[2pt]
 \raggedright
-{\small Exploitability in percent of the pot; the dashed line is the 0.3\% target. The fitted slopes of $\log\ex$ against
-$\log T$ at the end of each run are about $-1$ for CFR, $-1.4$ to $-1.7$ for CFR$^+$ and $-1.4$ to $-2.1$ for DCFR.}
+{\small Exploitability in percent of the pot on the three example spots; the dashed line is the 0.3\% target. On random
+boards DCFR reached 0.3\% before CFR$^+$ on \SampRiverOneVsPlus\ river boards and \SampTurnOneVsPlus\ turn boards with one bet size
+(sign test \SampTurnOneVsPlusP), and before CFR on all of them.}
 \note{
-All three methods use the same code and differ only in $(\alpha,\beta,\gamma)$. DCFR is fastest on every street. Slopes over the last
-twentieth, tenth and fifth of each run:\\[2pt]
-{\setlength\tabcolsep{4pt}\input{data/slope_table.tex}}\\[3pt] The slopes are
-empirical rates over the end of each run and depend on the window, as the ranges show; the flop windows still include
-part of the early transient. They should not be read as asymptotic rates; the worst-case bound is $T^{-1/2}$ for all
-three. Explaining why the modern variants do so much better on poker trees is an open problem.
+All three methods use the same code and differ only in $(\alpha,\beta,\gamma)$. The curves are single spots and illustrate the
+comparison; the evidence is the paired comparison on random boards in the table below, where each board is solved by all three
+methods and the sign test counts the boards on which DCFR needs fewer iterations to reach 0.3\%:\\[2pt]
+{\setlength\tabcolsep{3pt}\scriptsize\input{data/algo_table.tex}}\\[3pt]
+Slopes of $\log\ex$ against $\log T$ on the three example spots, over the last twentieth, tenth and fifth of each run (iterations
+100--2000 on the river, 30--600 on the turn and 8--150 on the flop for the widest window):\\[2pt]
+{\setlength\tabcolsep{4pt}\input{data/slope_table.tex}}\\[3pt]
+A slope is a local rate over a window and changes with the window, as the ranges show. On the random flops the DCFR slope between
+1\% and 0.1\% of the pot is \SampFlopOneSlope\ over boards, and \SampFlopOneSlopeAlt\ between 3\% and 0.3\%. These are not
+asymptotic rates; the worst-case bound is $T^{-1/2}$ for all three methods, and explaining the observed rates is an open problem.
 }
 \end{frame}
 
 % =====================================================================================
 \begin{frame}{Iterations to a fixed accuracy}
-DCFR on five river, five turn and three flop spots, with one tree per street: median and range of the iterations needed
-for each accuracy, in percent of the pot. Counts are the first checkpoint below the target, and checkpoints are 15\% apart.
+\small DCFR on uniformly random boards, same ranges and betting menu on every street: median iterations and a 95\%
+confidence interval for the median.
 \begin{center}
-{\footnotesize\setlength\tabcolsep{8pt}\input{data/tol_table.tex}}
+{\scriptsize\setlength\tabcolsep{4pt}\input{data/sample_table.tex}}
 \end{center}
 \begin{columns}[T]
 \column{0.5\textwidth}
-\small The iterations vary by less than a factor of two between spots. On one flop (right) they depend on the betting
-structure, not on the number of nodes: both trees without river betting need 40, one size on every street needs 71,
-and a flop check-raise raises this to 110. The running time is governed by the cost per iteration.
+\small The count grows with the amount of betting, not with the number of nodes: on the same boards a second size and a
+raise multiply it by \SampRiverTreeRatio\ (river) and \SampTurnTreeRatio\ (turn), and each further street of betting by two to
+three. With 95\% confidence, at least \SampFlopOneTol\ of flops need at most \SampFlopOneMax\ iterations with this tree.
 \column{0.48\textwidth}
-\centering
-{\footnotesize\setlength\tabcolsep{4pt}\input{data/treesize_table.tex}}
+\centering\vspace{-8pt}
+\includegraphics[width=\linewidth]{sample_iters.pdf}
 \end{columns}
 \note{
-Boards: river K72T4, A8492 two-tone, T9832, QJ552, 762KA; the turn spots are the first four cards of the same boards; flop spots K72
-rainbow, T98 two-tone and A84 two-tone. Ranges are the big blind's call and the button's open.\\[3pt]
-This is the practical statement behind ``a few hundred iterations'': it is a measured median over spots, not a theorem.
+Population: boards dealt uniformly from the deck (for flops this weights each of the 1755 distinct flops by its orbit size), the big
+blind's call and the button's open as ranges, pots and stacks of a single-raised pot. ``One size'': every player may check or bet
+75\% of the pot on every street, no raises. ``Two sizes, raise'': bets of 33\% and 75\% and a raise of 50\%. Seeds are fixed, the
+river and turn boards of the two structures are the same (paired), and every board drawn was solved; none was excluded.\\[3pt]
+Exploitability is evaluated every iteration up to 20 and then 5\% apart, and a count is the first evaluation at or below the
+target, so it overstates the crossing by at most 5\%. The interval $[x_{(j)},x_{(n+1-j)}]$ covers the median with probability at
+least 95\% for any continuous distribution; the tolerance statement uses $P(\text{all }n\le q_p)=p^n$. Both are distribution-free.\\[3pt]
+Scope: one pair of ranges and two betting menus. On the fixed K72 flop, trees of very different size need the same number of
+iterations when the betting is the same:\\[2pt]
+{\setlength\tabcolsep{4pt}\input{data/treesize_table.tex}}
 }
 \end{frame}
 
@@ -717,7 +732,7 @@ between the opponents.
 \item The flop takes seconds per iteration in a browser and grows with every added bet size. Commercial solvers are
 native code with vector instructions and suit isomorphism.
 \item The proven rate of DCFR is $O(T^{-1/2})$ with a vacuous constant. The fast observed rates are not explained by
-theory.
+theory, and the iteration counts are measured for one pair of ranges and two betting menus.
 \item Preflop play treats postflop as an all-in showdown, so it overvalues hands that realize equity poorly.
 \item Multiway solutions have no equilibrium guarantee and use an independence approximation for card removal
 between opponents.
@@ -763,8 +778,9 @@ correct version must apply the skipped discounts lazily.
 sweeps makes every leaf linear in the number of hands.
 \item A two-term cost model accounts for the time per iteration, single precision storage reaches the same
 exploitability, and the partition by chance card reproduces the sequential results.
-\item DCFR reaches practical accuracy in a few hundred iterations on every street we measured, so the cost per
-iteration decides the running time.
+\item On random boards, DCFR reaches 0.3\% of the pot in a median of \SampRiverOneMed, \SampTurnOneMed\ and
+\SampFlopOneMed\ iterations on river, turn and flop with one bet size, and in fewer than 200 on every board sampled. The count
+grows with the betting, while the cost per iteration grows with the whole tree, so the latter decides the running time.
 \end{itemize}
 \vfill
 {\small Site, source and experiments: \texttt{github.com/dwangnumbers/Poker-Solver}}
