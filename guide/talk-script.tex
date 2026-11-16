@@ -1,0 +1,677 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,amsmath,amssymb,booktabs,enumitem,array,xcolor,longtable}
+\usepackage[most]{tcolorbox}
+\usepackage[colorlinks,linkcolor=blue!50!black]{hyperref}
+\setlength{\parskip}{5pt}\setlength{\parindent}{0pt}
+\newcommand{\SP}{\ensuremath{\spadesuit}}\newcommand{\DI}{\ensuremath{\diamondsuit}}\newcommand{\CL}{\ensuremath{\clubsuit}}
+\newtcolorbox{say}{breakable,before upper={\setlength{\parskip}{5pt}},colback=blue!3,colframe=blue!40!black,left=6pt,right=6pt}
+\newtcolorbox{act}{breakable,before upper={\setlength{\parskip}{5pt}},colback=orange!8,colframe=orange!70!black,left=6pt,right=6pt}
+\newcommand{\slidehead}[3]{\subsection*{Slide #1. #2 \hfill {\normalfont\small #3}}}
+\newcommand{\cue}[1]{{\small\itshape\color{black!65}[#1]}}
+\title{Talk Script and Structure\\[4pt]\large Range-Vectorized Discounted Regret Minimization for No-Limit Hold'em}
+\author{}\date{}
+\begin{document}
+\maketitle
+\vspace{-3em}
+This is a word-for-word script for the 60-minute talk with slides \texttt{tex/talk.pdf} and the live demonstration
+on the site. Blue boxes are what to say. Orange boxes are what to do. Italic cues in brackets are stage directions.
+The script is written at about 140 words per minute. Speak it in your own words once you know it; the numbers are
+the parts to keep exact.
+
+\tableofcontents
+
+\section{Structure and timing}
+\begin{center}
+\begin{tabular}{rllrr}
+\toprule
+& part & slides & minutes & clock at end\\ \midrule
+1 & The problem and how error is measured & 1--5 & 7 & 0:07\\
+2 & The algorithm: CFR and DCFR & 6--7 & 7 & 0:14\\
+3 & One iteration: traversal and leaves & 8--11 & 9 & 0:23\\
+4 & Cost, memory, precision, parallelism & 12--15 & 9 & 0:32\\
+5 & Convergence and validation & 16--18 & 6 & 0:38\\
+6 & Live demonstration & 19 & 9 & 0:47\\
+7 & Extensions, limitations, conclusions & 20--28 & 8 & 0:55\\
+8 & Questions & & 5 & 1:00\\ \bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The story in one breath.} A solver is one simple iteration repeated a few hundred times. The number of
+repetitions is about the same everywhere, so everything depends on making one iteration cheap, accurate and
+parallel. Parts 3 and 4 are the heart; do not let parts 1 and 2 run long.
+
+\textbf{If you are running late.} At 0:25 instead of 0:23: shorten Memory to two sentences. At 0:40 instead of
+0:38: use the five-minute demonstration. In part 7, slides 23 and 24 can each be cut to one sentence.
+
+\textbf{Before you start.} Add your name to the title slide. Open the site in a second window with the Postflop page
+loaded and the K72 example selected; open the Preflop page in another tab so the equity tables are already
+downloaded. Close other heavy programs.
+
+% =====================================================================================
+\section{Part 1. The problem and how error is measured (7 minutes)}
+
+\slidehead{1}{Title}{1 min}
+\begin{say}
+Thank you all for coming. My talk is about poker solvers, the programs that compute how poker should be played.
+
+I want to start with a claim. A poker solver is one numerical method, called discounted counterfactual regret
+minimization, applied to one structured optimization problem. The method itself fits on a single slide. So the
+interesting question is not what the algorithm is. The question is what makes it fast and accurate. How is one step
+organized? What does it cost? How much precision does it need? And how do you split it across processors?
+
+Those are numerical analysis questions, and they are what this talk is about. I built a solver to have something
+real to measure, and you will see it run live later.
+\end{say}
+
+\slidehead{2}{Background and scope}{1.5 min}
+\begin{say}
+Some background. In 2017 two programs beat professional players at two-player no-limit hold'em, and in 2019 a
+program beat professionals at the six-player game. The engine inside all of them is a family of algorithms called
+counterfactual regret minimization, or CFR.
+
+Since then, commercial solvers have become standard study tools for players. You give them a situation: the cards
+on the board, the hands each player might hold, and the bet sizes you allow. They return the equilibrium strategy.
+
+What I built is a solver of that kind that runs in a web browser. It handles the flop, the turn and the river. It
+has the main features of the commercial tools. And it uses one algorithm throughout, discounted CFR.
+
+On the right is its output: one player's strategy, for every starting hand, in one situation. Green is check and
+red is bet. A square that is part green and part red is a hand that mixes. The whole talk is about how numbers like
+these are computed.
+\end{say}
+
+\slidehead{3}{Outline}{0.5 min}
+\begin{say}
+Here is the plan. The top row is the core: the problem, the algorithm, how one iteration is organized, what it
+costs, precision, parallelism and convergence. Then I will switch to the browser for a demonstration, and finish
+with the extensions built on the same core and what comes next.
+\end{say}
+
+\slidehead{4}{The postflop subgame}{2 min}
+\begin{say}
+Let me set up the problem, and I will assume no poker knowledge.
+
+Each player holds two private cards. Public cards, the board, are dealt in stages: three cards called the flop,
+then one called the turn, then one called the river, with betting after each stage.
+
+A solver works on a subgame. You specify the board, the money in the pot, the money left to bet, and two more
+things. First, a range for each player. You do not know your opponent's hand, but you know which hands are
+plausible, and a range is simply a weight for every possible hand. It is a vector. Second, a bet tree: the few bet
+sizes we allow, which makes the game finite.
+
+How long are these vectors? With three board cards there are at most 1176 two-card hands, and 1081 on the river.
+
+The unknowns are an action distribution for every hand at every decision point. My running example is the most
+common situation in online poker, on the board king, seven, two. The table shows the sizes. A river problem has
+seventeen decision points. The flop problem has fifty-seven thousand, each with about four hundred and seventy
+hands. That is tens of millions of unknowns, because every possible turn card and every possible river card opens
+its own copy of the later betting.
+\end{say}
+
+\slidehead{5}{Zero-sum games, equilibrium and exploitability}{2 min}
+\begin{say}
+What does it mean to solve this? Two-player poker is zero-sum: what I win, you lose. If I describe my strategy by a
+vector x and yours by y, my expected winnings are x transpose A y, linear in each.
+
+Von Neumann's minimax theorem says there is a pair of strategies where neither player can improve alone. That is a
+Nash equilibrium, and it is what a solver computes. For the optimizers in the room, this is a saddle-point problem.
+
+Now the most important definition of the talk. An iterative method never reaches the exact equilibrium, so we need
+a measure of error. It is called exploitability. Take the current strategies. Ask how much I could gain by
+switching to my best possible reply, and how much you could gain by switching to yours. Average the two. It is
+zero exactly at equilibrium, and we report it as a percentage of the pot.
+
+Two things make it a good error measure. It has a meaning: it is money a perfect opponent could take from you. And
+it is computable without knowing the answer. In practice, 0.3 percent of the pot counts as solved.
+
+One caveat: if the casino takes a fee from the pot, the game is not zero-sum and the theorems I show do not apply.
+The solver still runs and reports the same quantity.
+\end{say}
+\cue{Clock check: 0:07.}
+
+% =====================================================================================
+\section{Part 2. The algorithm (7 minutes)}
+
+\slidehead{6}{Regret matching and counterfactual regret minimization}{3.5 min}
+\begin{say}
+Here is the algorithm. It rests on one idea: regret.
+
+After each round of play, for each action, ask: how much better would I have done with this action than with what I
+actually did? That is the regret. Add it up over time. Then use a very simple rule, the formula on the right: play
+each action in proportion to its positive accumulated regret. If I keep wishing I had bet more, I bet more.
+
+A quick example with rock, paper, scissors. I start uniform and you play rock. Paper would have won, so paper has
+regret plus one, and next round I play paper. You play scissors, and now rock has the most regret. The strategies
+chase each other. What converges is the average over time.
+
+Poker has many decision points, and CFR applies this rule separately at every decision point and for every hand.
+The word counterfactual refers to the payoff it uses: the value of an action, weighted by the probability that the
+opponent and the cards actually lead to this point.
+
+The theorem says this works. The exploitability of the average strategies is bounded by a constant over the square
+root of the number of iterations T.
+
+Look at the constant. It contains the number of information sets, which for our flop problem is twenty-seven
+million. If you put in the numbers, after ten thousand iterations the bound is around a hundred million chips, for a
+pot of five and a half chips. So the theorem guarantees convergence and says nothing useful about speed. That gap
+between theory and practice is why I will measure convergence later.
+\end{say}
+
+\slidehead{7}{Discounted CFR}{3.5 min}
+\begin{say}
+The version I use is discounted CFR, from Brown and Sandholm in 2019. The motivation is simple. Early iterations
+are bad, because the strategies start out random. Plain CFR remembers those early regrets forever.
+
+Discounted CFR forgets. Before adding the new regret, it multiplies the old sum by a factor a little below one.
+Positive regrets are multiplied by t to the one and a half over t to the one and a half plus one. Negative regrets
+are halved. And in the average strategy, iteration t gets weight t squared. So after ten iterations the first
+iteration counts for a quarter of a percent, where a plain average would give it ten percent.
+
+A nice feature is that plain CFR and the well-known variant CFR-plus are special cases of the same formula. In my
+code they differ only in three parameters, which will make the comparison fair.
+
+I also update the players in alternation: the second player responds to the first player's new strategy. If you
+know iterative methods for linear systems, this is Gauss--Seidel in place of Jacobi.
+
+The last line on this slide is there because of a mistake I made, and I think it is the most instructive moment of
+the project. If the opponent never reaches some part of the tree, all values there are zero. So I skipped those
+parts. It seemed harmless. But skipping also skipped the discounting there, so I was no longer running the
+algorithm on the slide. On a small test game the error after a thousand iterations was two hundred and fifty times
+larger than it should have been. And it still converged, slowly, so nothing looked broken.
+
+The fix is to visit those parts, apply the discounts, and skip only the leaf computations. And there is now a test
+that the numbers match a version with no shortcut, bit for bit. The lesson: an optimization is only correct if it
+leaves the iterates unchanged, and that needs a test.
+\end{say}
+\cue{Clock check: 0:14.}
+
+% =====================================================================================
+\section{Part 3. One iteration: traversal and leaves (9 minutes)}
+
+\slidehead{8}{Range-vectorized traversal of the public tree}{2.5 min}
+\begin{say}
+Now the heart of the talk: how one iteration is organized.
+
+The solver works on what is called the public tree. It contains only the things both players see: the bets and the
+board cards. The private hands are not in the tree. Instead, at every node, every quantity is a vector with one
+entry per hand.
+
+One iteration is one walk through this tree for each player. On the way down, I carry the opponent's reach vector:
+for each of his hands, the probability that he plays it this way. On the way up, I return a value vector: what each
+of my hands is worth.
+
+The box lists what happens at each node. At the opponent's decision, I multiply his reach, entry by entry, by his
+strategy for each action and go down. At my own decision, I go down every action, combine the values with my
+strategy, and update my regrets. At a chance node I average over the cards. At a leaf I compute payoffs.
+
+Why does this matter? A naive program walks the tree once for every pair of hands, more than two hundred thousand
+walks. This version walks it twice per iteration, and at each node it runs a short loop over about five hundred
+numbers stored side by side in memory, which is what processors are best at. The cost of a decision node is
+proportional to the number of hands times the number of actions.
+
+And notice: the products A times y and A transpose times x from the earlier slide are exactly what these walks
+compute. The matrix A is never formed.
+\end{say}
+
+\slidehead{9}{Chance nodes}{1.5 min}
+\begin{say}
+A short slide on chance nodes, where a card is dealt. The value of my hand is the average over the cards that can
+come. The question is the weight.
+
+Fix both players' hands. On the flop, three board cards and four private cards are known. That leaves 45 cards,
+each equally likely. In general K is 48 minus the number of board cards.
+
+The point of the lemma is that this number is the same for every pair of hands. So a chance node is a plain sum
+times one over K, with no bookkeeping per hand. It is easy to get wrong: using one over 49, the number of cards not
+on the board, makes every value about eight percent too small. I check this against exact solutions later.
+\end{say}
+
+\slidehead{10}{Fold leaves in linear time}{2.5 min}
+\begin{say}
+Now the leaves, where the hand ends. This is where the main trick is.
+
+There is a complication called card removal. Two players cannot hold the same card. If I hold the ace of spades,
+you do not. So when I compute the value of my hand, I may only count your hands that share no card with mine.
+
+The obvious way is a double loop: for each of my hands, go through all of yours and skip the clashes. That is n
+squared operations per leaf. With a thousand hands that is a million operations, at tens of thousands of leaves, in
+every iteration.
+
+Here is the better way for a fold, where I only need the total weight of your compatible hands. Take your total
+weight, tau. Subtract the weight of your hands that contain my first card. Subtract the weight of those that contain
+my second card. One hand, the one identical to mine, has now been subtracted twice, so add it back. That is
+inclusion and exclusion.
+
+To use it I need your total and one sum for each of the 52 cards. That is one pass over your hands, then one pass
+over mine. Linear, not quadratic.
+
+At the bottom is the linear algebra view. The table of which hands are compatible is the all-ones matrix, minus one
+small correction per card, plus a correction for identical hands. A simple matrix plus a few corrections can be
+applied quickly. Exploiting structure in place of storing a matrix is the recurring theme here.
+\end{say}
+
+\slidehead{11}{Showdown leaves in linear time}{2.5 min}
+\begin{say}
+A showdown is harder, because the payoff depends on who has the better hand. The idea is to sort.
+
+Sort your hands by strength, once for each board. Now the total weight of your hands that are weaker than mine is a
+running total along the sorted list. So I sweep up both sorted lists once, keeping a running total, and each of my
+hands reads off the weight it beats and the weight it ties. Card removal is handled inside the sweep with the same
+52 card sums as before.
+
+The formula says: assume I lose to everything compatible, then correct for the hands I beat and the hands I tie.
+
+The table shows it works. These are microseconds per leaf. Look at the last column, the double loop: when n
+doubles, it roughly quadruples. The sweep, in the middle, roughly doubles. At a thousand and eighty-one hands the
+sweep takes fourteen microseconds and the double loop takes four thousand: three hundred times faster. And the two
+agree to twelve digits.
+
+One flop iteration evaluates more than forty thousand showdowns per player, so this is the difference between two
+seconds and several minutes per iteration.
+\end{say}
+\cue{Clock check: 0:23.}
+
+% =====================================================================================
+\section{Part 4. Cost, memory, precision, parallelism (9 minutes)}
+
+\slidehead{12}{A cost model for one iteration}{2.5 min}
+\begin{say}
+So what does an iteration cost overall? I want a model I can test, not just a big-O statement.
+
+The model has two terms. The first counts the entries of the regret table: hands times actions, summed over all
+decision points. The second counts the hands at the showdowns that were evaluated. Each has a constant in
+nanoseconds.
+
+I timed 252 iterations on eight different trees and fitted the two constants by least squares: thirty nanoseconds
+per table entry and seventeen per hand at a showdown.
+
+A fit always looks good on its own data, so the last column is the honest test. I leave one tree out, fit on the
+other seven, and predict the one left out. On the two large flop trees the error is seven and ten percent. On the
+smallest trees it is up to thirty percent, where an iteration takes a few milliseconds and timing noise is large.
+The model also under-predicts trees dominated by leaves, so some per-leaf overhead is missing from it.
+
+What you should take from this slide: time per iteration is proportional to the size of the tree, about two to
+three seconds for these flop trees on one core. And adding a bet size multiplies the tree, because the new branch
+carries its own copy of everything below it.
+\end{say}
+
+\slidehead{13}{Memory}{1.5 min}
+\begin{say}
+Memory follows the same count. Each entry stores two numbers, a regret and a strategy sum, at four bytes each. Eight
+bytes times the number of entries. The simplest flop tree needs 431 megabytes. Add raises and sizes and you pass
+three gigabytes, which is more than a browser tab gets. Memory, not time, is what limits tree size in a browser.
+
+Two practical points. The numbers live in a few very large arrays, and each node holds a slice. Allocating one
+array per node took thirty-two seconds for a large tree; this takes under one. And the interface predicts the
+memory before building, by building one card's subtree and multiplying. Where I could build the full tree to
+check, the estimate was right to a tenth of a percent.
+\end{say}
+
+\slidehead{14}{Floating-point precision}{2.5 min}
+\begin{say}
+Next, precision. I store everything in single precision, about seven significant digits, to halve the memory. Is
+that safe?
+
+The risk with single precision is adding a small number to a large running sum: the small number gets rounded
+away. Here the sums grow slowly, thanks to the discounting, and a new term would only be lost after tens of
+millions of iterations. We run a few hundred. So the theory says it is safe.
+
+The plot is the experiment. I ran all four combinations: regrets in single or double precision, strategy sums in
+single or double. All four curves reach the same exploitability, down to two ten-thousandths of a percent of the
+pot. That is a thousand times below the practical target. Storage precision is not what limits accuracy.
+
+There is one subtle finding. The exploitabilities agree, but the strategies from single and double precision differ
+a little, by a bit under one percent on average. Is that rounding damage? I ran a control. Two double-precision
+runs, where I changed the input ranges in the seventh decimal place. They differ by just as much.
+
+So it is not about storage. Any tiny perturbation sends the method to a slightly different strategy that is
+equally good. In numerical analysis terms, the strategy is ill-conditioned with respect to exploitability. Picture a
+wide flat valley floor: every point is almost equally low, but the points are far apart. The solver guarantees how
+low you are, not where on the floor you stand.
+\end{say}
+
+\slidehead{15}{Parallel partition by the first chance card}{2.5 min}
+\begin{say}
+Last in this part: parallelism. The tree has a natural place to cut. After the first betting round a card is
+dealt, and what happens below one card is independent of what happens below another.
+
+So I give each processor a share of the cards. A coordinator keeps the small top of the tree. One pass is three
+steps. The coordinator walks the top and records the reach vectors at each point where a card is dealt. Each worker
+computes the values under its own cards and returns one sum. The coordinator divides by K and finishes.
+
+Very little data moves, a few kilobytes of vectors, against millions of operations per card.
+
+The model is simple: the time is the coordinator's time plus the number of cards of the busiest worker times the
+time per card. On the flop there are 49 turn cards, so with two workers the busier one has 25.
+
+The table is measured in the browser. On the flop: about 2.3 seconds on one core, 1.2 seconds with two workers. A
+speedup of 1.9 on two cores, and the model predicts it to within the timing noise. My test machine has two cores, so
+I cannot show more; the model predicts about a third of a second with eight, and I label that an extrapolation.
+
+One honest detail. The parallel result is not bit-for-bit identical to the sequential one, because the card sums
+are added in a different order. They agree to fourteen digits.
+\end{say}
+\cue{Clock check: 0:32.}
+
+% =====================================================================================
+\section{Part 5. Convergence and validation (6 minutes)}
+
+\slidehead{16}{Convergence of CFR, CFR$^+$ and DCFR}{2 min}
+\begin{say}
+We know what one iteration costs. How many do we need?
+
+These plots show exploitability against iterations, on logarithmic axes, for a river, a turn and a flop problem.
+Blue is plain CFR, orange is CFR-plus, green is discounted CFR. The dashed line is the 0.3 percent target.
+
+On a log-log plot a straight line of slope minus k means the error behaves like one over T to the k. The theorem
+promised slope minus one half. What we measure at the end of these runs is about minus one for CFR, and between
+minus 1.4 and minus 2.1 for discounted CFR. On the flop after 150 iterations, CFR is at 1.6 percent of the pot and
+discounted CFR is at 0.05 percent.
+
+Two cautions. These are slopes over a finite window, not proven rates. And nobody can currently explain why the
+method beats its own worst-case bound by this much. That is an open problem.
+\end{say}
+
+\slidehead{17}{Iterations to a fixed accuracy}{2 min}
+\begin{say}
+One problem per street is thin evidence, so here are thirteen: five river, five turn, three flop. The table gives
+the median number of iterations to reach each accuracy, with the range.
+
+To reach 0.3 percent: about 95 on the river, 170 on the turn, 71 on the flop. Between different boards the count
+varies by less than a factor of two.
+
+The lower table fixes one flop and changes the tree. The first two trees differ by a factor of a hundred in size and
+need the same forty iterations. What increases the count is more betting options, not more nodes.
+
+This is the conclusion that organizes the whole talk. The number of iterations is roughly constant, a hundred or
+two. The cost per iteration ranges over three orders of magnitude from river to flop. So the cost per iteration
+decides the running time, and that is why I spent so long on it.
+\end{say}
+
+\slidehead{18}{Validation}{2 min}
+\begin{say}
+Before the demonstration: how do I know any of this is correct?
+
+Small zero-sum games can be solved exactly by a completely different method, linear programming. So I built small
+games a second time, separately, in Python, solved them with a linear programming solver, and compared the value of
+the game.
+
+On a turn game, the two values agree to seven digits. On a flop game with two levels of dealt cards, to six. On a
+larger turn game with 40 and 35 randomly chosen hands, to eight digits. These tests exercise the chance weighting,
+the card removal and the showdowns together.
+
+I compare values and not strategies because of the flat valley: strategies are not unique, the value is.
+
+The other rows check components. The parallel solver against the sequential one. The shortcut against no shortcut,
+bit for bit. The fast leaves against the double loop.
+
+What is missing is a comparison with an established solver on a full-size flop tree. I have not done that yet, and
+I will come back to it under limitations.
+\end{say}
+\cue{Clock check: 0:38. Switch to the browser.}
+
+% =====================================================================================
+\section{Part 6. Live demonstration (9 minutes)}
+
+\slidehead{19}{Demonstration}{9 min}
+\begin{say}
+Let me show you all of this running. Everything you will see runs in this browser tab; nothing is sent to a server.
+\end{say}
+
+\subsection*{Step 1. Solve a flop (about 2.5 minutes)}
+\begin{act}
+Show the Postflop page with the K72 example. Point at the board, the two range grids and the bet tree. Point at the
+estimate line under the tree. Press \textbf{Build and solve}.
+\end{act}
+\begin{say}
+This is the running example. The board is king, seven, two. On the left are the two ranges, and below them the bet
+tree with one bet size per street.
+
+Before I build anything, this line gives the estimate from the memory slide: about fifty-seven thousand decision
+points and 431 megabytes.
+
+I press build and solve. \cue{press} It is now building the tree in the worker threads. You can see the number of
+workers here.
+
+And here is the convergence plot from the talk, live. Each point costs two best-response computations, so I only
+evaluate every ten iterations. The axis is logarithmic and the dashed line is the 0.3 percent target. Each
+iteration is one or two seconds on this laptop, and we need about seventy of them.
+\end{say}
+\cue{While it runs, about one minute: keep talking.}
+\begin{say}
+While it runs: every iteration is exactly the two tree walks I described. The workers are each handling their share
+of the 49 turn cards and sending back sums. The reason this takes a minute or two and a commercial solver takes
+seconds is that this is plain JavaScript. They use compiled code and exploit suit symmetry.
+\end{say}
+\cue{If it has not reached the target after about 90 seconds, press \textbf{Stop} and say: ``I will stop it here at
+about [value] percent, which is enough to browse.''}
+
+\subsection*{Step 2. Browse the solution (about 2 minutes)}
+\begin{act}
+The strategy browser opens. Read the action buttons. Click \textbf{check}. In the card picker click the
+5\SP. Then switch the view to \textbf{EV}, then \textbf{Equity}, then back. Point at one square.
+\end{act}
+\begin{say}
+The solve has stopped, and this is the strategy browser. In this tree the first decision is the button's, and the
+buttons show how often he checks and how often he bets across his whole range.
+
+I click check. Now a card is dealt, so I choose one: the five of spades. \cue{click} Every turn card has its own
+solution; that is the copy of the tree under each card.
+
+This grid is the big blind's strategy on that turn. Each square is a starting hand. Green is check, red is bet, and
+the split inside a square is the mixing frequency. Strong hands and some weak hands bet; the middle mostly checks.
+That is the bluffing structure game theory predicts, and nobody programmed it in.
+
+I can switch to expected value, in chips, or to equity. And if I point at one square, the panel on the right lists
+each individual combination with its own strategy. The grid is a summary. The solver works with the individual
+hands, which is where card removal shows up.
+\end{say}
+
+\subsection*{Step 3. Lock a node (about 2 minutes)}
+\begin{act}
+Open \textbf{Node locking}. Press \textbf{Edit and lock}. Choose the bet action, set the frequency to 100\%, and
+drag across one row of medium hands. Press \textbf{Lock this strategy}, then \textbf{Continue}. When it stops,
+click the bet action to show the button's response.
+\end{act}
+\begin{say}
+Now a feature players use constantly. Suppose I know my opponent makes a specific mistake. Here, let me make the big
+blind bet these medium hands every time. I paint them, and lock.
+
+Locking freezes this strategy. When I press continue, the solver re-solves everything else around it.
+
+Watch the exploitability: it jumps, because the old solution no longer fits, and comes back down. \cue{wait} And
+now look at the button's response to the bet: it has changed. Typically he continues more often, because the
+betting range now contains medium hands he can attack.
+
+Mathematically, the solver is now finding the equilibrium of a restricted game. Nothing else in the code changes:
+locked regrets are simply not updated.
+\end{say}
+
+\subsection*{Step 4. Preflop (about 2 minutes)}
+\begin{act}
+Open the \textbf{Preflop and multiway} tab. The preset is heads-up push or fold, 10 bb. Press \textbf{Build and
+solve}. Point at the first action frequencies. Then choose \textbf{Six-max, 20 bb, with antes}, solve, and show the
+\textbf{First-in ranges} table.
+\end{act}
+\begin{say}
+The same algorithm also runs before the flop. Here strategies are per class of starting hand, 169 of them.
+
+This is the simplest preflop game: each player has ten big blinds and can only go all-in or fold. \cue{press} It
+converges in about a second. The small blind goes all-in with 58 percent of hands, and the big blind calls with 37
+percent. Those are the published equilibrium numbers, and a linear program gives the same values to five digits.
+
+Now six players. \cue{select and press} With more than two players there is no convergence guarantee, so the page
+reports how much the players could still gain by deviating. This table shows how often each seat enters the pot. It
+is a sensible strategy, but it is not a proven equilibrium, and I say so on the page.
+\end{say}
+\cue{Switch back to the slides. Clock check: 0:47.}
+
+\subsection*{The five-minute version}
+Do step 1 (stop the solve at 60 seconds), step 2 without the EV and equity views, and only the push-or-fold solve of
+step 4. Skip locking and say: ``The next slide shows locking with numbers.''
+
+\subsection*{If something goes wrong}
+\begin{itemize}[nosep]
+\item \textbf{The page will not load or the solve fails.} Go back to the slides. Slide 19 has a screenshot of the
+browser; describe step 2 from it and move on.
+\item \textbf{The solve is very slow.} Stop it early. Any exploitability under about 2\% gives a browsable solution.
+\item \textbf{Out of memory.} Reload and choose the turn example spot (K72 with a 5); it needs little memory and
+solves in seconds.
+\end{itemize}
+
+% =====================================================================================
+\section{Part 7. Extensions, limitations, conclusions (8 minutes)}
+
+\slidehead{20}{Node locking}{1.25 min}
+\begin{say}
+Here is locking with numbers, on a river problem. In equilibrium the button never bets a third of the pot after a
+check. I lock him to always make that bet.
+
+Against the lock, the big blind folds 29 percent of the time in place of 49, and her result improves by ten chips a
+hand. Always betting is an expensive mistake, and the solver quantifies it.
+
+One subtlety. The 49 percent is a response to a bet that never happens in equilibrium, and game theory does not pin
+down behaviour in situations that never arise. And the last row: the locked game is no harder to solve.
+\end{say}
+
+\slidehead{21}{Aggregate flop reports}{1.25 min}
+\begin{say}
+Players also ask questions across all flops, such as how often to bet on average. There are 22,100 flops, but
+suits are interchangeable, which leaves 1,755 that are really different.
+
+A report solves a sample of them and takes a weighted average. This is numerical integration: a quadrature rule
+over flops. The sample is stratified by the type of board, and that gives the error bars in the table. With 25, 49
+or 95 flops the answers agree within those error bars. The middle column is the error from not solving each flop
+exactly, and it is smaller than the sampling error.
+\end{say}
+
+\slidehead{22}{Preflop: card removal between hand classes}{1.5 min}
+\begin{say}
+Before the flop, as you saw, the vectors have length 169. Card removal now acts between classes. If I hold ace-king,
+it is half as likely that you hold two aces. The matrix M records these fractions exactly. It is all ones except
+where two classes share a rank, about a quarter of the entries, so multiplying by it is again a sum with a sparse
+correction.
+
+The table is the check against linear programming for the all-in-or-fold game at four stack sizes. The values agree
+to five digits.
+
+The limitation is that a hand reaching the flop is settled as if both players were all-in. Betting after the flop is
+not modelled here.
+\end{say}
+
+\slidehead{23}{Payoff errors and exploitability}{1 min}
+\begin{say}
+The preflop solver depends on a table of winning probabilities that is estimated by random sampling, so it has
+small errors. We are solving a slightly wrong game. How wrong is the solution?
+
+The lemma answers in the worst case: if every payoff is off by at most delta, the solution is off by at most
+delta in exploitability. This is classic error propagation.
+
+Then I measured it, with two independent tables. The actual effect is ten thousand to a hundred thousand times
+smaller than the bound, because random errors cancel when you average over a range of hands.
+\end{say}
+
+\slidehead{24}{Three-way showdowns: a low-rank factorization}{0.75 min}
+\begin{say}
+With three players all-in, the probabilities form a table with 169 cubed entries, and using it directly is too slow.
+Each slice is a symmetric matrix, so I keep its sixteen most important eigen-components. That is five times cheaper,
+with an error of about a quarter of a percent in the quantity we need.
+\end{say}
+
+\slidehead{25}{Multiway convergence}{0.5 min}
+\begin{say}
+With more than two players there is no theorem. So I measure. The all-in-or-fold games converge essentially
+exactly. A realistic six-player game stalls at a few hundredths of a big blind. Useful, but not an equilibrium.
+\end{say}
+
+\slidehead{26}{Limitations}{0.5 min}
+\begin{say}
+The limitations, plainly. It is slow next to commercial solvers. The fast convergence has no theory. The preflop
+model ignores later betting. Parallel scaling is measured on two cores only. And the flop solver has not yet been
+compared with an established solver on a full-size tree; my exact checks go up to 40 hands per player.
+\end{say}
+
+\slidehead{27}{Next steps}{0.5 min}
+\begin{say}
+So the first next step is that comparison. After that: the high-precision finish with a Newton-type method that I
+presented last time, which is where new research would go. Then engineering: suit symmetry, compiled code, and
+pruning done in a way that keeps the iterates exact.
+\end{say}
+
+\slidehead{28}{Conclusions}{0.75 min}
+\begin{say}
+To conclude. One method, discounted CFR, solves all of these games.
+
+What makes it fast is structure. Vectors over hands turn an iteration into simple loops. Inclusion and exclusion
+and a sorted sweep make every leaf linear in place of quadratic.
+
+What makes it trustworthy is measurement. A cost model tested on held-out trees, a precision experiment with a
+control, a parallel version checked against the sequential one, and exact solutions to compare with.
+
+And the number of iterations is about the same everywhere, so the cost of one iteration is what decides everything.
+
+The site, the code and every experiment are at the address on the slide. Thank you. I am happy to take questions.
+\end{say}
+\cue{Clock check: 0:55.}
+
+% =====================================================================================
+\section{Part 8. Questions you should expect}
+\begin{description}[leftmargin=1em,itemsep=4pt]
+\item[Why not just solve it as a linear program?] ``For small games I do, as a check. For the flop the matrix would
+have a dense five-hundred by five-hundred block at each of about seventy thousand leaves. It cannot be stored. CFR
+only needs products with the matrix, and the tree walk computes those without forming it.''
+\item[Why does DCFR beat its bound by so much?] ``Nobody knows. The bound is a worst case over all games. Poker
+trees clearly have more structure. It is an open problem and I list it under next steps.''
+\item[Is the last strategy or the average the answer?] ``The average. The current strategy keeps moving; the
+weighted average is what converges and what the theorem is about.''
+\item[How does this compare with PioSolver in speed?] ``Much slower: seconds per flop iteration against a small
+fraction of a second. They use compiled, vectorized code and solve only one of each group of equivalent cards. The
+algorithmic ideas, the vectors and the linear-time leaves, are the same.''
+\item[Why trust it without a comparison to a commercial solver?] ``The exact linear programming checks cover every
+component together on games up to 40 hands per player, and the exploitability I report is computed independently of
+the iteration. A full-size comparison is the first thing I will do next, and I say on the slide that it is missing.''
+\item[If strategies are not unique, what use is the output?] ``Every output is within the stated exploitability, so
+any of them is nearly unbeatable. What is not determined is fine detail, such as whether a hand bets 30 or 35
+percent. The value of the game and the broad structure are stable.''
+\item[Why single precision if double is safer?] ``Half the memory, and memory is the limit in a browser. The
+experiment shows the same exploitability with either.''
+\item[Why is the parallel result not identical?] ``Floating-point addition depends on the order of the terms in the
+last digits. The workers add card values in a different order. The difference is in the fourteenth digit.''
+\item[What happened with the skipped subtrees exactly?] ``The values there are zero, so skipping the values is fine.
+But DCFR also discounts the stored regrets every iteration, everywhere. Skipping the visit skipped the discount, so
+those regrets were stale when the opponent started reaching that part again.''
+\item[Does it handle more than two players after the flop?] ``No. Postflop is two players. Preflop handles up to
+six, without a convergence guarantee.''
+\item[What does the Newton method add?] ``DCFR gets three or four digits cheaply and then slows down. A Newton-type
+method started from that point reached thirteen digits on river problems in my earlier work. Extending it to the
+flop is the research direction.''
+\end{description}
+
+\newpage
+\section{One-page cheat sheet of numbers}
+\begin{center}\small
+\begin{tabular}{ll}
+\toprule
+Hands avoiding the board & 1176 flop, 1128 turn, 1081 river\\
+Running example & K\SP 7\DI 2\CL, 488 and 460 hands, pot 5.5, stacks 97.5\\
+Decision points & 17 river, 1{,}349 turn, 56{,}842 flop\\
+Target accuracy & 0.3\% of the pot\\
+DCFR parameters & $(1.5,\ 0,\ 2)$\\
+Bug factor & 250 times worse (0.64 against 0.0025 chips)\\
+Cards left at a chance node & $K=48-|\text{board}|$: 45 flop, 44 turn\\
+Leaf at 1081 hands & sweep 13.7 $\mu$s, double loop 4272 $\mu$s, about 300$\times$\\
+Cost model & 30 ns per entry, 17 ns per showdown hand; held-out error 7 and 10\%\\
+Memory & 8 bytes per entry; 431 MB for the simplest flop tree\\
+Precision & same exploitability down to $2\times10^{-4}$\%; strategies differ by about 0.007\\
+Parallel, flop & 2317 ms sequential, 1212 ms with 2 workers, speedup 1.9\\
+Slopes & CFR about $-1$; DCFR $-1.4$ to $-2.1$; theory $-0.5$\\
+Iterations to 0.3\% & river 95, turn 170, flop 71 (medians)\\
+LP checks & agree to 6--9 digits; largest game 40 and 35 hands\\
+Push or fold, 10 bb & shove 58\%, call 37\%\\
+Flops & 22{,}100 total, 1{,}755 distinct\\
+Lock example & fold 49\% $\to$ 29\%, value $-16.2\to-6.2$ chips\\ \bottomrule
+\end{tabular}
+\end{center}
+\end{document}
