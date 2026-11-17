@@ -123,31 +123,6 @@ slide.
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Outline}
-\centering
-\begin{tikzpicture}[x=1cm,y=1cm,every node/.style={font=\scriptsize}]
-  \foreach \i/\t in {0/{Problem and\\ equilibria}, 1/{CFR and\\ DCFR}, 2/{Vectorized\\ traversal}, 3/{Leaf\\ evaluation},
-                     4/{Cost and\\ memory}, 5/{Precision}, 6/{Parallel\\ partition}, 7/{Convergence}}{
-    \node[draw=cblue,line width=1pt,rounded corners=3pt,text width=1.2cm,minimum height=1.05cm,align=center,
-          inner sep=2pt,fill=cblue!8] (n\i) at (1.62*\i,0) {\t};
-  }
-  \foreach \i [evaluate=\i as \j using int(\i+1)] in {0,...,6} { \draw[-{Latex},ink2] (n\i) -- (n\j); }
-  \foreach \i/\t in {0/{Demon-\\stration}, 1/{Node\\ locking}, 2/{Flop\\ reports}, 3/{Preflop and\\ multiway}, 4/{Next\\ steps}}{
-    \node[draw=caqua,line width=1pt,rounded corners=3pt,text width=1.2cm,minimum height=1.05cm,align=center,
-          inner sep=2pt,fill=caqua!8] (m\i) at (1.62*\i+2.43,-1.6) {\t};
-  }
-  \foreach \i [evaluate=\i as \j using int(\i+1)] in {0,...,3} { \draw[-{Latex},ink2] (m\i) -- (m\j); }
-  \draw[-{Latex},ink2] (n7.south) |- ++(0,-0.3) -| (m0.north);
-\end{tikzpicture}
-
-\vspace{1.2em}
-\raggedright
-The first row is the solver core and its analysis. The second row shows the core at work and the extensions built on
-it.
-\note{Keep this slide short.}
-\end{frame}
-
-% =====================================================================================
 \begin{frame}{The postflop subgame}
 \begin{columns}[T]
 \column{0.5\textwidth}
