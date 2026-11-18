@@ -183,7 +183,8 @@ With rake, DCFR is used as a heuristic; the measured exploitability is still rep
 % =====================================================================================
 \begin{frame}{Regret matching and counterfactual regret minimization}
 At every information set $I$, CFR keeps a cumulative regret per action and plays in proportion to its positive part:
-\[ R_T(I,a) = \sum_{t=1}^T \big(v_t(I,a) - v_t(I)\big), \qquad \sigma_{T+1}(I,a) = \frac{[R_T(I,a)]^+}{\sum_b [R_T(I,b)]^+}. \]
+\[ R_T(I,a) = \sum_{t=1}^T \big(v_t(I,a) - v_t(I)\big), \qquad \sigma_{T+1}(I,a) = \Pr\nolimits_{T+1}(a\mid I) = \frac{[R_T(I,a)]^+}{\sum_b [R_T(I,b)]^+}, \]
+the probability of action $a$ at $I$ in iteration $T+1$.
 The values $v_t$ are \textbf{counterfactual}: they are weighted by the probability that chance and the opponent reach $I$.
 \begin{block}{Theorem (Zinkevich, Johanson, Bowling and Piccione 2007)}
 The overall regret is bounded by the sum of the counterfactual regrets, so the average strategies satisfy
@@ -212,7 +213,7 @@ If every instantaneous regret satisfies $|r_t(a)|\le\Delta$, regret matching giv
 \small
 \textbf{Proof.} Let $\Phi_t=\sum_a\big([R_t(a)]^+\big)^2$, the squared length of the positive regret vector.
 \begin{enumerate}\setlength\itemsep{1pt}
-\item Since $r_t(a)=u_t(a)-u_t(\sigma_t)$ and $\sigma_t$ is a probability vector, $\sum_a\sigma_t(a)\,r_t(a)=0$. As $\sigma_t$ is
+\item Since $r_t(a)=u_t(a)-u_t(\sigma_t)$ and $\sigma_t(a)=\Pr\nolimits_t(a)$ is a probability vector, $\sum_a\sigma_t(a)\,r_t(a)=0$. As $\sigma_t$ is
 proportional to $[R_{t-1}]^+$, also $\sum_a[R_{t-1}(a)]^+\,r_t(a)=0$.
 \item For all real $x$ and $r$, $\big([x+r]^+\big)^2\le\big([x]^++r\big)^2$, by the cases $x+r\le0$, $x\ge0$ and $x<0<x+r$.
 \item Hence $\Phi_t\le\Phi_{t-1}+2\sum_a[R_{t-1}(a)]^+r_t(a)+\sum_ar_t(a)^2\le\Phi_{t-1}+|A|\Delta^2$, and $\Phi_T\le|A|\Delta^2T$.
@@ -244,7 +245,8 @@ Adding the two and halving gives the claim.\hfill$\square$
 \medskip
 \textbf{CFR.} For perfect recall the overall regret of a player splits over information sets,
 \[ \textstyle\sum_t\big(u(\sigma')-u(\sigma_t)\big)=\sum_I\pi^{\sigma'}(I)\sum_a\sigma'(I,a)\,R_T(I,a)\;\le\;\sum_I\max_a[R_T(I,a)]^+ , \]
-and each term is at most $\Delta\sqrt{|A|T}$ by the previous slide. This proves the CFR theorem. Letting $T\to\infty$ also proves
+where $\sigma'(I,a)=\Pr\nolimits_{\sigma'}(a\mid I)$ and $\pi^{\sigma'}(I)$ is the probability that the player's own actions under $\sigma'$
+reach $I$. Each term is at most $\Delta\sqrt{|A|T}$ by the previous slide. This proves the CFR theorem. Letting $T\to\infty$ also proves
 the minimax theorem.
 \note{
 The decomposition identity is a telescoping sum over the information sets of the player, using that her own reach is the same at every
@@ -260,15 +262,16 @@ The lemma is about the averages. The current strategies of regret matching need 
 \begin{frame}{Discounted CFR}
 DCFR discounts the cumulative quantities at iteration $t$ before adding the new ones:
 \[ R \leftarrow \begin{cases} R\,\dfrac{t^\alpha}{t^\alpha+1} & R>0\\[6pt] R\,\dfrac{t^\beta}{t^\beta+1} & R\le 0\end{cases} \;+\; \big(v(a)-v\big),
-   \qquad S \leftarrow S\Big(\frac{t}{t+1}\Big)^{\gamma} + \pi_{\mathrm{own}}\,\sigma_t . \]
+   \qquad S \leftarrow S\Big(\frac{t}{t+1}\Big)^{\gamma} + \pi_{\mathrm{own}}(I)\,\sigma_t(I,a) . \]
+Here $\sigma_t(I,a)=\Pr\nolimits_t(a\mid I)$, and $\pi_{\mathrm{own}}(I)$ is the player's own probability of reaching $I$.
 We use $(\alpha,\beta,\gamma) = (1.5,0,2)$ and update the players alternately. CFR is the limit $\alpha=\beta=\infty$,
 $\gamma=0$, and CFR$^+$ is $\alpha=\infty$, $\beta=-\infty$, $\gamma=1$.
 \begin{block}{Theorem (Brown and Sandholm 2019)}
 With $(\alpha,\beta,\gamma)=(1.5,0,2)$ and simultaneous updates, the weighted average strategies form a
 $6\Delta|\mathcal I|\big(\sqrt{|A|}+1/\sqrt T\big)/\sqrt T$ equilibrium after $T$ iterations.
 \end{block}
-The implementation computes exactly these iterates: subtrees that the opponent cannot reach are still visited to apply
-the discounts and strategy sums, and only their leaves are skipped.
+\vspace{-4pt}The implementation computes exactly these iterates: subtrees the opponent cannot reach are still visited to apply the
+discounts, and only their leaves are skipped.
 \note{
 The theorem is proved for simultaneous updates. The solver alternates the players, which is standard practice; regret bounds for
 alternating updates are discussed by Burch, Morav\v{c}\'{\i}k and Schmid (2019).\\[3pt]
@@ -323,7 +326,8 @@ Regrets and strategy sums are stored action-major, so the inner loops run over h
 \column{0.43\textwidth}
 \begin{block}{One traversal for player $p$}
 \small
-At an opponent node, recurse on each action $a$ with reach $r_{-p}\odot\sigma(a)$ and add the child values.\\[3pt]
+At an opponent node, recurse on each action $a$ with reach $r_{-p}\odot\sigma(a)$, where $\sigma(a)_h=\Pr(a\mid h)$, and add the
+child values.\\[3pt]
 At an own node, recurse on every action, set $v = \sum_a \sigma(a)\odot v_a$ and update $R$ and $S$.\\[3pt]
 At a chance node, average the children over the dealt cards.\\[3pt]
 At a leaf, return the payoff against $r_{-p}$.
@@ -729,7 +733,7 @@ first-in table.
 
 % =====================================================================================
 \begin{frame}{Node locking}
-A locked node keeps a fixed strategy $\hat\sigma$: its regrets are not updated, the traversals use $\hat\sigma$, and
+A locked node keeps a fixed strategy $\hat\sigma(I,a)=\Pr(a\mid I)$: its regrets are not updated, the traversals use $\hat\sigma$, and
 best responses do not optimize over it. DCFR then solves the \textbf{restricted game}
 \[ \min_{y\in Y}\ \max_{x\in X,\ x|_{\text{locked}} = \hat\sigma}\ x^\top A y . \]
 Example on the river: after a check the button is locked to bet a third of the pot with every hand. In equilibrium it
