@@ -205,6 +205,58 @@ $10^{7}$ chips. The observed behaviour is far better and is measured later.
 \end{frame}
 
 % =====================================================================================
+\begin{frame}{Regret matching: proof of the $\sqrt T$ bound}
+\begin{block}{Theorem (Hart and Mas-Colell 2000)}
+If every instantaneous regret satisfies $|r_t(a)|\le\Delta$, regret matching gives $\max_a R_T(a)\le\Delta\sqrt{|A|\,T}$.
+\end{block}
+\small
+\textbf{Proof.} Let $\Phi_t=\sum_a\big([R_t(a)]^+\big)^2$, the squared length of the positive regret vector.
+\begin{enumerate}\setlength\itemsep{1pt}
+\item Since $r_t(a)=u_t(a)-u_t(\sigma_t)$ and $\sigma_t$ is a probability vector, $\sum_a\sigma_t(a)\,r_t(a)=0$. As $\sigma_t$ is
+proportional to $[R_{t-1}]^+$, also $\sum_a[R_{t-1}(a)]^+\,r_t(a)=0$.
+\item For all real $x$ and $r$, $\big([x+r]^+\big)^2\le\big([x]^++r\big)^2$, by the cases $x+r\le0$, $x\ge0$ and $x<0<x+r$.
+\item Hence $\Phi_t\le\Phi_{t-1}+2\sum_a[R_{t-1}(a)]^+r_t(a)+\sum_ar_t(a)^2\le\Phi_{t-1}+|A|\Delta^2$, and $\Phi_T\le|A|\Delta^2T$.
+\item Finally $\max_aR_T(a)\le\sqrt{\Phi_T}\le\Delta\sqrt{|A|T}$.\hfill$\square$
+\end{enumerate}
+\note{
+Step 1 is the geometric heart: the new regret vector is orthogonal to the current positive regret vector, so the positive part grows
+like a random walk with steps of bounded length, not like a drift. This is Blackwell approachability of the negative orthant.\\[3pt]
+Step 2 in detail: if $x+r\le0$ the left side is zero. If $x\ge0$ both sides equal $(x+r)^2$. If $x<0<x+r$ then $x^+=0$ and
+$0<x+r<r$, so $(x+r)^2<r^2$.\\[3pt]
+Check on four rounds of rock--paper--scissors against the sequence rock, scissors, paper, rock: the largest regret is $8/3$ and the bound
+with $\Delta=2$, $|A|=3$, $T=4$ is $2\sqrt{12}\approx6.9$.
+}
+\end{frame}
+
+% =====================================================================================
+
+\begin{frame}{From small regret to an approximate equilibrium}
+\begin{block}{Lemma}
+If the average regrets of the two players after $T$ rounds are at most $\varepsilon_1$ and $\varepsilon_2$, the averages
+$\bar x_T,\bar y_T$ satisfy $\ex(\bar x_T,\bar y_T)\le\tfrac12(\varepsilon_1+\varepsilon_2)$.
+\end{block}
+\small
+\textbf{Proof.} The payoff is linear in each argument, so $\frac1T\sum_t x'^\top Ay_t=x'^\top A\bar y_T$ for every $x'$, and likewise for
+$y'$. With $\bar U=\frac1T\sum_tx_t^\top Ay_t$ the regret bounds read
+\[ \max_{x'}x'^\top A\bar y_T-\bar U\le\varepsilon_1,\qquad \bar U-\min_{y'}\bar x_T^\top Ay'\le\varepsilon_2 . \]
+Adding the two and halving gives the claim.\hfill$\square$
+
+\medskip
+\textbf{CFR.} For perfect recall the overall regret of a player splits over information sets,
+\[ \textstyle\sum_t\big(u(\sigma')-u(\sigma_t)\big)=\sum_I\pi^{\sigma'}(I)\sum_a\sigma'(I,a)\,R_T(I,a)\;\le\;\sum_I\max_a[R_T(I,a)]^+ , \]
+and each term is at most $\Delta\sqrt{|A|T}$ by the previous slide. This proves the CFR theorem. Letting $T\to\infty$ also proves
+the minimax theorem.
+\note{
+The decomposition identity is a telescoping sum over the information sets of the player, using that her own reach is the same at every
+history of an information set (perfect recall). The study guide writes out the telescoping and checks it on a two-decision example.\\[3pt]
+Minimax: with both players running regret matching, $\min_y\max_x\le\max_xx^\top A\bar y_T\le\min_y\bar x_T^\top Ay+2\varepsilon_T\le
+\max_x\min_y+2\varepsilon_T$ with $\varepsilon_T\to0$; weak duality gives the other inequality.\\[3pt]
+The lemma is about the averages. The current strategies of regret matching need not converge at all.
+}
+\end{frame}
+
+
+% =====================================================================================
 \begin{frame}{Discounted CFR}
 DCFR discounts the cumulative quantities at iteration $t$ before adding the new ones:
 \[ R \leftarrow \begin{cases} R\,\dfrac{t^\alpha}{t^\alpha+1} & R>0\\[6pt] R\,\dfrac{t^\beta}{t^\beta+1} & R\le 0\end{cases} \;+\; \big(v(a)-v\big),
@@ -228,6 +280,32 @@ factor of 250. A test now checks that the regrets and sums agree bit for bit wit
 decision work of the skipped subtrees; their leaves are still skipped.
 }
 \end{frame}
+
+% =====================================================================================
+\begin{frame}{Discounted CFR: what the discounts do}
+\begin{block}{Lemma}
+The strategy added at iteration $k$ enters $S$ after iteration $T$ with weight $\big(\tfrac{k+1}{T+1}\big)^\gamma$. With $\gamma=2$ and
+contributions of size one, $S_T=\tfrac T3+1+O(1/T)$.
+\end{block}
+\small
+\textbf{Proof.} The contribution is multiplied by $\big(\tfrac t{t+1}\big)^\gamma$ at each later iteration $t=k+1,\dots,T$, and
+$\tfrac{k+1}{k+2}\cdot\tfrac{k+2}{k+3}\cdots\tfrac{T}{T+1}=\tfrac{k+1}{T+1}$. For the sum, $\sum_{j=2}^{T+1}j^2=\tfrac{(T+1)(T+2)(2T+3)}6-1$;
+divide by $(T+1)^2$.\hfill$\square$
+
+\medskip
+\textbf{Regrets.} A positive regret is multiplied by $1-\tfrac1{t^{1.5}+1}\ge1-t^{-1.5}$, so from iteration $k$ on it keeps at least
+\[ \textstyle\prod_{t>k}\big(1-t^{-1.5}\big)\;\ge\;1-\sum_{t>k}t^{-1.5}\;\ge\;1-\tfrac{2}{\sqrt k}. \]
+A negative regret is halved at every iteration. The method keeps good actions and forgets bad ones within a few iterations.
+\note{
+Example of the weights: for $T=4$ they are $0.16$, $0.36$, $0.64$ and $1$, so the last iteration has 46\% of the average and the first 7\%.
+For $T=100$ the first iteration has about $0.001\%$.\\[3pt]
+The product bound uses $\prod(1-a_t)\ge1-\sum a_t$ for $a_t\in[0,1]$, by induction, and $\sum_{t>k}t^{-1.5}\le\int_k^\infty x^{-1.5}dx$.
+For $k=10$ the bound is $0.37$ and the actual product is $0.54$.\\[3pt]
+The weighted version of the previous lemma, with weights $w_t$ in place of $1/T$, has the same proof; it is the starting point of the
+Brown--Sandholm theorem. The growth $S_T\approx T/3$ is used on the precision slide.
+}
+\end{frame}
+
 
 % =====================================================================================
 \begin{frame}{Range-vectorized traversal of the public tree}
@@ -269,8 +347,11 @@ $\;\Pr(c \mid h_1,h_2,\mathrm{board}) = 1/K$.
 \end{block}
 Hence the chance node returns
 \[ v_p(h) \;=\; \frac1K \sum_{c\,\notin\,\mathrm{board}} \mathbf 1[c\notin h]\; v_p^{(c)}(h), \]
-where the child for card $c$ is evaluated with the opponent's hands containing $c$ set to zero reach. The weight is
-the same constant for every hand pair, so chance needs no normalization by range.
+where the child for card $c$ is evaluated with the opponent's hands containing $c$ set to zero reach.
+
+\small\textbf{Proof.} Given the $|\mathrm{board}|+4$ seen cards, the shuffle makes every unseen card equally likely. Write the value as a
+sum over opponent hands $j$ and cards $c\notin\mathrm{board}\cup h\cup j$ with the constant weight $1/K$, and exchange the two sums:
+for fixed $c$ the inner sum runs over the $j$ not containing $c$.\hfill$\square$
 \note{
 The conditional probability of the next card depends only on the four known private cards, which are excluded by the indicator and
 by zeroing the opponent's reach. Using $1/(52-|\mathrm{board}|)$ would bias every value.\\[3pt]
@@ -325,6 +406,32 @@ At 1081 hands the sweep is several hundred times faster than the direct sum and 
 \FlopShowLeaves\ showdown leaves per traversal.
 }
 \end{frame}
+
+% =====================================================================================
+\begin{frame}{Proof of the leaf formulas}
+\begin{block}{Lemma (inclusion--exclusion)}
+For two-card hands $h=\{h_1,h_2\}$ and $j$:\quad $\mathbf 1[j\cap h=\emptyset]=1-\mathbf 1[h_1\in j]-\mathbf 1[h_2\in j]+\mathbf 1[j=h]$.
+\end{block}
+\small
+\textbf{Proof.} If $j$ shares no card with $h$ the right side is $1$. If it shares one card it is $0$. If it shares both, then $j=h$ and it is
+$1-1-1+1=0$.\hfill$\square$
+
+Multiplying by $r_j$ and summing over $j$ gives the fold formula $m(h)=\tau-s_{h_1}-s_{h_2}+r_{\bar h}$.
+
+\medskip
+\textbf{Showdown.} In $v(h)=\ell\,m(h)+(w-\ell)L(h)+(\theta-\ell)\big(L^=(h)-L(h)\big)$ the coefficient of a compatible $r_j$ is
+\[ \ell+(w-\ell)=w \text{ if $j$ is weaker},\qquad \ell+(\theta-\ell)=\theta \text{ if it ties},\qquad \ell \text{ if it is stronger}, \]
+which are the payoffs. In the sweep, $L$ and $L^=$ are the same inclusion--exclusion restricted to the weaker and the
+weaker-or-equal hands. The identical hand $\bar h$ has the strength of $h$, so its correction enters $L^=$ only.\hfill$\square$
+\note{
+Worked example with card removal. I hold A$\spadesuit$K$\spadesuit$ with strength 3; $w=5$, $\ell=-5$, $\theta=0$. The opponent holds
+7$\clubsuit$6$\clubsuit$ (strength 1, reach 1), K$\spadesuit$2$\diamondsuit$ (2, 0.5), A$\spadesuit$Q$\clubsuit$ (3, 1), K$\heartsuit$J$\heartsuit$
+(3, 0.5) and Q$\heartsuit$Q$\diamondsuit$ (5, 1). Below strength 3 the running total is 1.5, of which 0.5 contains K$\spadesuit$, so $L=1$.
+Up to strength 3 the total is 3, with 1 containing A$\spadesuit$ and 0.5 containing K$\spadesuit$, so $L^==1.5$. The fold formula gives
+$m=4-1-0.5=2.5$. Then $v=-12.5+10+2.5=0$, which matches win, tie and loss against the three compatible hands.
+}
+\end{frame}
+
 
 % =====================================================================================
 \begin{frame}{A cost model for one iteration}
@@ -416,6 +523,32 @@ Half the memory for the same result.
 \end{frame}
 
 % =====================================================================================
+\begin{frame}{Rounding error in the strategy sums}
+\begin{block}{Lemma}
+With the update $S\leftarrow\mathrm{fl}\big(\mathrm{fl}(S\,w_t)+x_t\big)$, $0\le w_t\le1$, $x_t\ge0$ and unit roundoff $u$, the computed
+sum after $T$ updates satisfies $|\hat S_T-S_T|\le2Tu\,S_T+O(u^2)$.
+\end{block}
+\small
+\textbf{Proof.} Each operation returns the exact result times $1+\delta$ with $|\delta|\le u$. Write $e_t=\hat S_t-S_t$. One update gives
+$e_t=w_te_{t-1}+\eta_t$ with $|\eta_t|\le2u\,S_t+O(u^2)$, using $w_tS_{t-1}\le S_t$. Unrolling,
+$|e_T|\le\sum_t\big(\prod_{k>t}w_k\big)|\eta_t|\le2u\sum_tS_T=2Tu\,S_T$, because $\prod_{k>t}w_k\,S_t\le S_T$.\hfill$\square$
+
+\medskip
+\textbf{Consequence.} The strategy is a ratio of such sums, so its relative error is at most about $4Tu$. In single precision,
+$u=2^{-24}\approx6\times10^{-8}$, this is $5\times10^{-5}$ after 200 iterations: about four correct digits, more than the iteration itself
+delivers. A new term $x_t\le1$ is lost entirely only when $x_t<\tfrac12u\,S_t\approx\tfrac16u\,t$, after about $10^8$ iterations.
+\note{
+The bound is the classical recursive-summation bound with a discount, linear in $T$ and therefore pessimistic; with rounding errors of
+random sign the typical error grows like $\sqrt T\,u$.\\[3pt]
+Rounding therefore cannot explain the strategy differences on the previous slide. Those come from the conditioning of the problem: any
+perturbation of size $10^{-7}$, rounding or a change of the inputs, moves DCFR to a different point of the wide set of near-equilibria.\\[3pt]
+The regrets are not sums of nonnegative terms, so the lemma does not apply to them directly; experimentally the precision of the regrets
+is also harmless.
+}
+\end{frame}
+
+
+% =====================================================================================
 \begin{frame}{Parallel partition by the first chance card}
 \begin{columns}[T]
 \column{0.53\textwidth}
@@ -500,6 +633,30 @@ iterations when the betting is the same:\\[2pt]
 \end{frame}
 
 % =====================================================================================
+\begin{frame}{Distribution-free statements about the sample}
+DCFR is deterministic, so the iteration count is a function $X=f(S)$ of a random spot $S$, and a sample is $n$ independent draws.
+\begin{block}{Lemma}
+For a continuous distribution with median $m$ and $B\sim\mathrm{Bin}(n,\tfrac12)$,\quad
+$P\big(X_{(j)}\le m\le X_{(n+1-j)}\big)=1-2P(B\le j-1)$.
+\end{block}
+\small
+\textbf{Proof.} Let $B$ be the number of draws below $m$; each draw is below $m$ with probability $\tfrac12$, independently. The interval
+misses on the left exactly when $B\le j-1$ and on the right exactly when $B\ge n+1-j$, which has the same probability by symmetry.\hfill$\square$
+
+\medskip
+For $n=20$ and $j=6$ the coverage is $1-2\cdot\tfrac{21700}{2^{20}}\approx0.96$. Similarly $P(X_{(n)}<q_p)=p^n$, so with $p=0.05^{1/n}$ the
+largest count bounds the $p$-quantile with 95\% confidence: $p=0.86$ for 20 flops. The paired comparisons use the sign test: under
+equal speed each untied board favours either method with probability $\tfrac12$.
+\note{
+None of these statements assumes a distribution for the counts. Ties between integer counts only make the intervals conservative.\\[3pt]
+The sign test p-value is $2P(B\le\min(w,l))$ with $B\sim\mathrm{Bin}(w+l,\tfrac12)$. For 40 wins and no losses it is $2^{-39}$.\\[3pt]
+The population is stated on the previous slide: boards dealt uniformly, one pair of ranges, two betting menus. The intervals say
+nothing about other ranges or trees.
+}
+\end{frame}
+
+
+% =====================================================================================
 \begin{frame}{Validation}
 \footnotesize
 \renewcommand{\arraystretch}{1.1}
@@ -526,6 +683,27 @@ unique.\\[3pt]
 A comparison with an established open-source solver on the same flop tree is the natural next test.
 }
 \end{frame}
+
+% =====================================================================================
+\begin{frame}{Why values are compared and strategies are not}
+\begin{block}{Lemma}
+For every pair, $|x^\top Ay-v^\ast|\le\max(g_1,g_2)\le2\ex(x,y)$, where $g_1,g_2$ are the two best-response gains. In particular every
+equilibrium has value $v^\ast$.
+\end{block}
+\small
+\textbf{Proof.} $v^\ast=\min_{y'}\max_{x'}x'^\top Ay'\le\max_{x'}x'^\top Ay=x^\top Ay+g_1$, and
+$v^\ast=\max_{x'}\min_{y'}x'^\top Ay'\ge\min_{y'}x^\top Ay'=x^\top Ay-g_2$.\hfill$\square$
+
+\medskip
+Equilibrium strategies need not be unique: for $A=\begin{pmatrix}0&1\\0&1\end{pmatrix}$ every $x$ paired with the first column is an
+equilibrium, all with value $0$. So DCFR and the LP may return different strategies, but their values must agree within twice the
+remaining exploitability. On the mid-size turn check the difference is \TurnMidDiff\ against an exploitability of \TurnMidExpl.
+\note{
+This lemma is the reason the validation slide reports values. It also bounds the error of every value the solver reports, for example the
+flop-report averages, by twice the exploitability of each solve.
+}
+\end{frame}
+
 
 % =====================================================================================
 \begin{frame}{Demonstration}
@@ -637,15 +815,15 @@ If the payoffs of a game are perturbed by at most $\delta$ at every terminal nod
 at most $\delta$, and an $\varepsilon$-equilibrium of the perturbed game is an $(\varepsilon+\delta)$-equilibrium of the
 original game.
 \end{block}
-The equity tables are Monte Carlo estimates. Two independent tables differ by at most \SensMax, so with $\delta$ the pot
-times that difference each solution is an $(\varepsilon+\delta)$-equilibrium of the other game. The measured
-cross-exploitability is four to five orders of magnitude smaller:
-\begin{center}
+\small\textbf{Proof.} $|u'-u|\le\sum_z\pi(z)\,|U'(z)-U(z)|\le\delta$. So each best-response value moves by at most $\delta$, and
+$\ex=\tfrac12(\max_{x'}u-\min_{y'}u)\le\ex'+\delta$.\hfill$\square$
+
+\vspace{-2pt}The equity tables are Monte Carlo estimates. Two independent tables differ by at most \SensMax, which gives $\delta$; the measured
+cross-exploitability is four to five orders of magnitude below $\varepsilon+\delta$:
+\begin{center}\vspace{-4pt}
 {\footnotesize\setlength\tabcolsep{5pt}\input{data/sens_table.tex}}
 \end{center}
 \note{
-Proof of the lemma: each best-response value is a maximum of expected payoffs, each of which moves by at most $\delta$, so each half of
-the exploitability moves by at most $\delta/2$ in our normalization.\\[3pt]
 The two tables define two games whose payoffs differ by at most $\delta$, so one application of the lemma gives the bound
 $\varepsilon+\delta$ rigorously. Cross-exploitability is the exploitability of the table-1 solution measured in the table-2 game. It is
 four to five orders of magnitude below the bound, because errors of different entries have different signs and average out over a range. The push frequencies of the two

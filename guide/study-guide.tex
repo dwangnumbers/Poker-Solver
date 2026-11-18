@@ -61,7 +61,7 @@ Proofs end with a small square $\square$. Talk slide numbers refer to \texttt{te
 \newpage
 
 % ============================================================================
-\section{Cards, hands and ranges}\label{sec:cards}\slide{4}
+\section{Cards, hands and ranges}\label{sec:cards}\slide{3}
 \begin{definition}[Card, hand]\label{def:hand}
 A deck has 52 \emph{cards}: 13 ranks (2, 3, \dots, 9, T, J, Q, K, A) in 4 suits (\SP, \HE, \DI, \CL). A \emph{hand}
 is a set of two different cards, for example $\{\text{A\SP},\text{K\SP}\}$, written A\SP K\SP. The order of the two
@@ -95,7 +95,7 @@ The number of such subsets is $\binom{52}{2}=\frac{52\cdot51}{2}=1326$.
 So the hand is a 2-subset of the other $52-3=49$ cards: $\binom{49}{2}=\frac{49\cdot48}{2}=1176$.
 \st On the turn: $\binom{48}{2}=\frac{48\cdot47}{2}=1128$. On the river: $\binom{47}{2}=\frac{47\cdot46}{2}=1081$.
 \st So a range on the flop is a vector of length at most 1176. \by{\Def{def:range}}
-These are the numbers on slide 4.
+These are the numbers on slide 3.
 \end{example}
 
 \begin{example}[Counting classes and combinations]\label{ex:classes}
@@ -121,7 +121,7 @@ choice of the talk.
 \end{example}
 
 % ============================================================================
-\section{Games, best responses and exploitability}\label{sec:games}\slide{5}
+\section{Games, best responses and exploitability}\label{sec:games}\slide{4}
 \begin{definition}[Zero-sum matrix game]\label{def:game}
 A two-player zero-sum matrix game is an $m\times k$ matrix $A$. Player 1 (the \emph{row player}) chooses a row $i$,
 player 2 (the \emph{column player}) chooses a column $j$, and player 2 pays player 1 the amount $A_{ij}$. Player 1
@@ -294,7 +294,7 @@ is 0.3\%.
 \end{example}
 
 % ============================================================================
-\section{Regret matching}\label{sec:rm}\slide{6}
+\section{Regret matching}\label{sec:rm}\slide{5--6}
 \begin{definition}[Repeated play]\label{def:repeat}
 A player with actions $a\in\mathcal A$ plays rounds $t=1,2,\dots$. In round $t$ she picks a probability vector
 $\sigma_t$ over $\mathcal A$. Then she learns the payoff $u_t(a)$ each action \emph{would} have earned (it depends on
@@ -388,7 +388,7 @@ $\sum_ar_t(a)^2$: e.g.\ round 3 adds $\tfrac{1+4+25}{9}=\tfrac{10}3$ and indeed 
 \end{example}
 
 % ============================================================================
-\section{From small regret to equilibrium}\label{sec:folk}
+\section{From small regret to equilibrium}\label{sec:folk}\slide{7}
 \begin{definition}[Regret against a fixed opponent sequence]\label{def:gameregret}
 Two players play the matrix game repeatedly: $x_t$ and $y_t$ in round $t$. Player 1's regret is
 $\mathcal R^1_T=\max_{x'}\sum_tu(x',y_t)-\sum_tu(x_t,y_t)$; player 2's is
@@ -541,7 +541,7 @@ The expected payoff is $\sum_z\pi^\sigma(z)U(z)$. By \Def{def:reach}, $\pi^\sigm
 probabilities, player 2's probabilities and chance's probabilities along the path. Player 1's product along the path
 to $z$ is exactly $x(z)$ (\Def{def:plan}), and similarly for player 2.
 \end{proof}
-So the tree game \emph{is} a game of the form $x^\top Ay$ with $x$ and $y$ realization plans; this is the slide 5
+So the tree game \emph{is} a game of the form $x^\top Ay$ with $x$ and $y$ realization plans; this is the slide 4
 statement ``the expected payoff is bilinear''. All of \S\ref{sec:folk} applies to plans.
 
 \begin{definition}[Average strategy]\label{def:avg}
@@ -567,7 +567,7 @@ both times). \by{\Def{def:avg}}
 \end{example}
 
 % ============================================================================
-\section{Counterfactual regret minimization (CFR)}\label{sec:cfr}\slide{6}
+\section{Counterfactual regret minimization (CFR)}\label{sec:cfr}\slide{5, 7}
 \begin{definition}[Counterfactual value]\label{def:cfv}
 Fix both strategies $\sigma$. For a history $h$ let $V^\sigma_p(h)$ be player $p$'s expected payoff from $h$ onward. For an
 information set $I$ of $p$ and an action $a$,
@@ -672,7 +672,7 @@ instead (\S\ref{sec:conv}): on 20 random flops the median is \SampFlopOneMed\ it
 \end{example}
 
 % ============================================================================
-\section{Discounted CFR}\label{sec:dcfr}\slide{7}
+\section{Discounted CFR}\label{sec:dcfr}\slide{8--9}
 \begin{definition}[DCFR update]\label{def:dcfr}
 At iteration $t$, for every information set, action $a$ and with parameters $(\alpha,\beta,\gamma)=(1.5,0,2)$:
 \[ R\leftarrow\begin{cases}R\cdot\dfrac{t^\alpha}{t^\alpha+1}&R>0\\[6pt]R\cdot\dfrac{t^\beta}{t^\beta+1}&R\le0\end{cases}\;+\;r_t(I,a),
@@ -782,7 +782,7 @@ really are 0). A test checks bit-for-bit equality with a version that never skip
 better, its measured speed is much better.
 \end{takeaway}
 % ============================================================================
-\section{One iteration: vectors on the public tree}\label{sec:public}\slide{8}
+\section{One iteration: vectors on the public tree}\label{sec:public}\slide{10}
 \begin{definition}[Public tree]\label{def:public}
 The \emph{public tree} has one node for every sequence of \emph{public} events: bets, calls, folds and dealt board
 cards. Private hands are not in it. A public node $s$ where player $p$ acts, together with one of $p$'s hands $h$, is an
@@ -862,7 +862,7 @@ update of \Def{def:dcfr}), each entry taking a fixed number of operations.
 \end{proof}
 
 % ============================================================================
-\section{Chance nodes}\label{sec:chance}\slide{9}
+\section{Chance nodes}\label{sec:chance}\slide{11}
 \begin{lemma}[The next card is uniform over $K$ cards]\label{lem:uniform}
 Fix the board $B$, player 1's hand $h$ and player 2's hand $j$ (compatible). Then the next board card is uniformly
 distributed over the $K=52-|B|-4=48-|B|$ cards not in $B\cup h\cup j$. On the flop $K=45$, on the turn $K=44$.
@@ -905,7 +905,7 @@ about $8\%$ too small. \by{\Lem{lem:uniform}}
 \end{example}
 
 % ============================================================================
-\section{Fold leaves in linear time}\label{sec:fold}\slide{10}
+\section{Fold leaves in linear time}\label{sec:fold}\slide{12, 14}
 \begin{definition}[Card sums]\label{def:cardsums}
 For an opponent reach vector $q$: the total $\tau=\sum_jq(j)$; for each card $c$, $s_c=\sum_{j\ni c}q(j)$, the weight of
 opponent hands containing $c$; and for my hand $h$, $q(\bar h)$, the weight of the opponent hand identical to $h$ (0 if
@@ -958,7 +958,7 @@ $C=\one\one^\top-EE^\top+P$, where $P$ matches identical hands. ``All ones, minu
 structured matrix whose product with a vector is cheap.
 
 % ============================================================================
-\section{Showdown leaves: sort, then sweep}\label{sec:show}\slide{11}
+\section{Showdown leaves: sort, then sweep}\label{sec:show}\slide{13--14}
 \begin{definition}[Strength and showdown payoffs]\label{def:strength}
 On a river board every hand $h$ has a \emph{strength} $\kappa(h)$, an integer; higher wins. Against $j$, player $p$ with $h$ gets
 $w$ if $\kappa(h)>\kappa(j)$, $\theta$ if equal and $\ell$ if smaller. Define the compatible weights
@@ -1018,7 +1018,7 @@ Microseconds per leaf. Doubling $n$ doubles the fold and sweep times and quadrup
 with agreement to 12 digits.
 
 % ============================================================================
-\section{A cost model fitted by least squares}\label{sec:cost}\slide{12}
+\section{A cost model fitted by least squares}\label{sec:cost}\slide{15}
 \begin{definition}[Work counts and cost model]\label{def:cost}
 $W_{\text{dec}}$ is the number of (decision node, hand, action) entries; $W_{\text{show}}$ the number of hands summed
 over the showdown leaves evaluated in one iteration. The \emph{cost model} is $T\approx a\,W_{\text{dec}}+b\,W_{\text{show}}$,
@@ -1065,7 +1065,7 @@ the largest \CostOOSMax. By kind: \CostOOSDesc.
 \end{example}
 
 % ============================================================================
-\section{Memory}\slide{13}
+\section{Memory}\slide{16}
 \begin{lemma}[Memory]\label{lem:mem}
 With regrets and strategy sums in single precision (4 bytes each), the tables take $8\,W_{\text{dec}}$ bytes.
 \end{lemma}
@@ -1081,7 +1081,7 @@ enough to build fully.
 \end{example}
 
 % ============================================================================
-\section{Floating-point arithmetic}\label{sec:fp}\slide{14}
+\section{Floating-point arithmetic}\label{sec:fp}\slide{17--18}
 \begin{definition}[Rounding model]\label{def:fl}
 A floating-point format stores $\pm m\cdot2^e$ with a fixed number of bits in $m$. Every operation returns the exact
 result rounded: $\mathrm{fl}(x\circ y)=(x\circ y)(1+\delta)$ with $|\delta|\le u$. The \emph{unit roundoff} is $u=2^{-24}\approx6\times10^{-8}$
@@ -1140,7 +1140,7 @@ much. Two iterates of one run are much closer ($1.2\times10^{-4}$ and $5.5\times
 \end{example}
 
 % ============================================================================
-\section{Parallel traversal}\label{sec:par}\slide{15}
+\section{Parallel traversal}\label{sec:par}\slide{19}
 \begin{lemma}[Exact split at the first chance node]\label{lem:split}
 Partition the dealt cards into groups $G_1,\dots,G_P$, one per worker. The chance node value of \Thm{thm:chance} is
 $v(h)=\frac1K\sum_{p=1}^P\Big(\sum_{c\in G_p,\,c\notin h}v^{(c)}(h)\Big)$, and the inner sums depend only on the reach
@@ -1174,7 +1174,7 @@ machine has two cores.
 \begin{center}\input{../tex/data/parallel_table.tex}\end{center}
 
 % ============================================================================
-\section{Measuring convergence}\label{sec:conv}\slide{16--17}
+\section{Measuring convergence}\label{sec:conv}\slide{20--22}
 \begin{lemma}[Power laws are straight lines on log--log axes]\label{lem:loglog}
 If $E(T)=C\,T^{-k}$, then $\log E=\log C-k\log T$: a straight line of slope $-k$ in $(\log T,\log E)$. The slope through
 two points is $\dfrac{\log E_2-\log E_1}{\log T_2-\log T_1}$.
@@ -1295,7 +1295,7 @@ On one fixed flop, trees of very different size need the same number of iteratio
 So the cost per iteration (\S\ref{sec:cost}) decides the running time.
 
 % ============================================================================
-\section{Validation by linear programming}\label{sec:valid}\slide{18}
+\section{Validation by linear programming}\label{sec:valid}\slide{23--24}
 \begin{definition}[Linear program of a matrix game]\label{def:lp}
 For the game $A$ of \Def{def:game}: maximize $v$ over $x\in\R^m$ and $v\in\R$ subject to $(A^\top x)_j\ge v$ for every
 column $j$, $x\ge0$, $\sum_ix_i=1$. (For a tree, the same with realization plans, \Def{def:plan}, and \Lem{lem:seqbilinear}.)
@@ -1322,7 +1322,7 @@ vs 24.92419856 (LP). Flop, 6 and 5 hands: 27.139343 vs 27.139333. Turn, 40 and 3
 differences are within $2\cdot\expl$ of the DCFR run, as \Lem{lem:valgap} requires.
 
 % ============================================================================
-\section{Node locking}\label{sec:lock}\slide{20}
+\section{Node locking}\label{sec:lock}\slide{26}
 \begin{definition}[Locked game]\label{def:lock}
 \emph{Locking} an information set $I$ fixes $\sigma(I,\cdot)$ to given probabilities. The \emph{restricted game} is the
 original game in which $I$ is treated as a chance node with those probabilities.
@@ -1350,7 +1350,7 @@ moves the big blind's fold frequency from 49\% to 29\% and her value from $-16.2
 \end{example}
 
 % ============================================================================
-\section{Aggregate flop reports}\label{sec:report}\slide{21}
+\section{Aggregate flop reports}\label{sec:report}\slide{27}
 \begin{definition}[Group action, orbit, stabilizer]\label{def:group}
 The \emph{symmetric group} $S_4$ is the set of the 24 permutations of the 4 suits. A permutation $g$ acts on a flop by
 renaming its suits. The \emph{orbit} of a flop $F$ is the set of flops $gF$; the \emph{stabilizer} is $\{g:gF=F\}$. Flops
@@ -1416,7 +1416,7 @@ the report.
 \begin{center}\input{../tex/data/report_table.tex}\end{center}
 
 % ============================================================================
-\section{Preflop classes and card removal}\label{sec:preflop}\slide{22}
+\section{Preflop classes and card removal}\label{sec:preflop}\slide{28}
 \begin{definition}[Class compatibility matrix]\label{def:M}
 For classes $i,k$ (\Def{def:class}), $M_{ik}$ is the fraction of (combination of $i$, combination of $k$) pairs that are
 compatible (\Def{def:board}). Write $M=\one\one^\top-D$.
@@ -1445,7 +1445,7 @@ with LP and DCFR values equal to five digits.
 \begin{center}\input{../tex/data/pf_table.tex}\end{center}
 
 % ============================================================================
-\section{Errors in the payoffs}\label{sec:pert}\slide{23}
+\section{Errors in the payoffs}\label{sec:pert}\slide{29}
 \begin{lemma}[Payoff perturbation]\label{lem:pert}
 Let $U'$ differ from $U$ by at most $\delta$ at every terminal. Then (a) $|u'(x,y)-u(x,y)|\le\delta$ for all strategies, and
 (b) if $\expl'(x,y)\le\varepsilon$ then $\expl(x,y)\le\varepsilon+\delta$.
@@ -1467,7 +1467,7 @@ errors of both signs cancel in the averages over ranges. The lemma is a worst ca
 \begin{center}\input{../tex/data/sens_table.tex}\end{center}
 
 % ============================================================================
-\section{Three-way showdowns: low rank}\label{sec:lowrank}\slide{24}
+\section{Three-way showdowns: low rank}\label{sec:lowrank}\slide{30}
 \begin{theorem}[Spectral theorem, stated]\label{thm:spectral}
 A real symmetric $n\times n$ matrix $F$ can be written $F=\sum_{r=1}^n\lambda_ru_ru_r^\top$ with real eigenvalues $\lambda_r$ and
 orthonormal eigenvectors $u_r$.
@@ -1501,7 +1501,7 @@ is $2.7\times10^{-3}$ (relative), while the slices themselves are not close to r
 \begin{center}\input{../tex/data/lowrank_table.tex}\end{center}
 
 % ============================================================================
-\section{More than two players}\label{sec:multi}\slide{25}
+\section{More than two players}\label{sec:multi}\slide{31}
 \begin{definition}[NashConv]\label{def:nashconv}
 For $N$ players, $\mathrm{NashConv}(\sigma)=\sum_{i=1}^N\big(\max_{\sigma'_i}u_i(\sigma'_i,\sigma_{-i})-u_i(\sigma)\big)$, the total gain
 available from unilateral best responses. For two zero-sum players it is $g_1+g_2=2\expl$ (\Def{def:expl}).
@@ -1527,7 +1527,7 @@ averages, the step fails, and only the correlated statement of \Thm{thm:cce} sur
 20 bb six-player tree stalls near $0.06$ bb.
 
 % ============================================================================
-\section{Limitations}\slide{26--27}
+\section{Limitations}\slide{32--33}
 The convergence speed is measured, not proved (\Ex{ex:vacuous}); multiway has no guarantee (\Thm{thm:cce}); preflop ends every
 hand that sees a flop with an all-in showdown; parallel timings are on two cores; the flop solver has not been compared with an
 established solver on a full tree. Next steps: that comparison, a Newton finish for high precision, suit symmetry to solve fewer
