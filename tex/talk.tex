@@ -777,7 +777,7 @@ pairing neighbouring strata. Each flop is solved to \ReportTol\% of the pot, whi
 river. Values are in chips with a pot of 5.5.}
 \end{columns}
 \note{
-Burnside's lemma gives 1755 (appendix). Orbit sizes are 24 for rainbow boards, 12 for two-tone and paired boards and 4 for monotone and
+Burnside's lemma gives 1755. Orbit sizes are 24 for rainbow boards, 12 for two-tone and paired boards and 4 for monotone and
 trips boards.\\[3pt]
 The value of the average strategy differs from the equilibrium value by at most the larger best-response gain, hence by at most twice
 the exploitability; the table gives this bound averaged over the flops. Bet frequencies have no such bound, which is why the flops are
@@ -955,69 +955,6 @@ vectors, leaves, memory and processors. Then take questions.}
 \item N.~Brown, T.~Sandholm. Superhuman AI for multiplayer poker. \emph{Science} 365 (2019).
 \item N.~Burch, M.~Morav\v{c}\'{\i}k, M.~Schmid. Revisiting CFR$^+$ and alternating updates. \emph{J.\ Artif.\ Intell.\ Res.} 64 (2019).
 \end{itemize}
-\end{frame}
-
-% =====================================================================================
-\appendix
-\begin{frame}{Appendix: the showdown sweep}
-\small
-The input is the own list sorted by strength $q_h$, the opponent list sorted by strength and the opponent reach $r$.
-\begin{enumerate}\setlength\itemsep{2pt}
-\item Set $\tau=0$ and $s_c=0$ for all cards $c$.
-\item For each block of own hands with equal strength $q$:
-  \begin{enumerate}
-  \item add every opponent hand $j$ with $q_j<q$ to $\tau$ and to $s_c$ for its two cards;
-  \item for each own hand $h$ of the block set $L(h)=\tau-s_{h_1}-s_{h_2}$;
-  \item add every opponent hand with $q_j=q$, and set $L^{=}(h)=\tau-s_{h_1}-s_{h_2}+r_{\bar h}$.
-  \end{enumerate}
-\item After the sweep, $m(h)$ is the fold formula with the final sums.
-\end{enumerate}
-Each opponent hand is added once and each own hand is read twice, so the cost is $O(n_1+n_2)$.
-\note{
-The identical hand $\bar h$ cannot be strictly weaker than $h$, so the correction appears only in $L^=$.
-}
-\end{frame}
-
-\begin{frame}{Appendix: counting flops with Burnside's lemma}
-The number of orbits of $S_4$ on flops is the average number of flops fixed by a suit permutation $g$:
-\[ \#\text{orbits} = \frac{1}{24}\sum_{g\in S_4} |\mathrm{Fix}(g)| = \frac{22100 + 6\cdot 2938 + 8\cdot 299}{24} = 1755 . \]
-\small
-\begin{tabular}{lc>{\raggedright\arraybackslash}p{7.2cm}}
-\toprule
-cycle type & count & flops fixed \\ \midrule
-identity & 1 & all $22{,}100$ \\
-transposition $(a\,b)$ & 6 & $\binom{26}{3}$ in the other two suits, plus a pair of equal rank in $a$ and $b$ with one more card: $2600+338$ \\
-3-cycle & 8 & $\binom{13}{3}$ in the fixed suit, plus one rank in the three cycled suits: $286+13$ \\
-double transposition, 4-cycle & 3, 6 & none \\ \bottomrule
-\end{tabular}
-
-\medskip
-\normalsize The code maps each flop to its smallest image under the 24 permutations and finds the same 1755 classes.
-\note{
-A flop has three cards, so a permutation that moves every suit cannot fix it unless its cards are permuted among themselves, which
-needs a cycle of length dividing the number of cards in the cycled suits. That rules out double transpositions and 4-cycles.
-}
-\end{frame}
-
-\begin{frame}{Appendix: the earlier high-precision results}
-\small
-The previous talk solved river subgames to machine precision with a proximal semismooth Newton method started from
-DCFR, with interior-point crossover and support restriction.
-\begin{center}
-\begin{tabular}{lcc}
-\toprule
-game & DCFR & DCFR then Newton \\ \midrule
-Leduc hold'em & $1.0\times10^{-5}$ in 14 s & $5.5\times10^{-14}$ in 0.33 s \\
-small river & $5.4\times10^{-6}$ in 9 s & $3.9\times10^{-14}$ in 1.9 s \\
-river of the talk & $1.3\times10^{-4}$ in 16 s & $3.2\times10^{-5}$ in 528 s \\ \bottomrule
-\end{tabular}
-\end{center}
-Exploitability in chips with a pot of 100. On the largest river the Newton phase was slower than DCFR, which is why the
-method is listed as a next step and not as part of the solver.
-\note{
-These are the numbers from \texttt{talk-newton.pdf}. The honest summary is that the finish is spectacular on small and medium games and
-not yet competitive on the largest river; the linear algebra of the dense leaf blocks inside the Newton systems is the bottleneck.
-}
 \end{frame}
 
 \end{document}
