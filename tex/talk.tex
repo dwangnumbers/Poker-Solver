@@ -83,9 +83,9 @@
 \begin{frame}[plain]
   \vspace*{-14pt}\titlepage
 \note{
-\textbf{Timing for 60 minutes.} Problem and equilibria 7 $\cdot$ CFR and DCFR 7 $\cdot$ Traversal and leaves 9 $\cdot$
-Cost, memory, precision and parallelism 9 $\cdot$ Convergence and validation 6 $\cdot$ Demonstration 9 $\cdot$
-Extensions and next steps 8 $\cdot$ Questions 5.\\[4pt]
+\textbf{Timing for 60 minutes.} Problem and equilibria 5 $\cdot$ CFR and DCFR with proofs 11 $\cdot$ Traversal and leaves 10 $\cdot$
+Cost, memory, precision and parallelism 10 $\cdot$ Convergence and value comparison 7.5 $\cdot$ Demonstration 5 $\cdot$
+Extensions and next steps 6 $\cdot$ Questions 5.5.\\[4pt]
 Opening line: ``A poker solver is one numerical method, discounted counterfactual regret minimization, applied to a structured
 bilinear saddle-point problem. This talk is about what makes that method fast and accurate: how an iteration is organized,
 what it costs, how precise it must be and how it is split across processors.''\\[4pt]
@@ -355,8 +355,8 @@ for fixed $c$ the inner sum runs over the $j$ not containing $c$.\hfill$\square$
 \note{
 The conditional probability of the next card depends only on the four known private cards, which are excluded by the indicator and
 by zeroing the opponent's reach. Using $1/(52-|\mathrm{board}|)$ would bias every value.\\[3pt]
-The lemma is checked against exact linear programs with explicit chance nodes, one chance level on the turn and two on the flop
-(validation slide).
+The lemma is checked against exact linear programs with explicit chance nodes, one chance level on the turn and two on the flop:
+the game values agree to six to nine digits.
 }
 \end{frame}
 
@@ -657,34 +657,6 @@ nothing about other ranges or trees.
 
 
 % =====================================================================================
-\begin{frame}{Validation}
-\footnotesize
-\renewcommand{\arraystretch}{1.1}
-\begin{tabular}{>{\raggedright\arraybackslash}p{3.3cm}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{4.7cm}}
-\toprule
-test & reference & result \\ \midrule
-River, talk example & the earlier implementation & same iterates: exploitability \RiverOldNew\ and \RiverOldOld\ chips after 5000 iterations \\
-Turn, one chance level & exact LP, \TurnHands\ hands & value \TurnJS\ against \TurnLP \\
-Flop, two chance levels & exact LP, \FlopHands\ hands & value \FlopJS\ against \FlopLP \\
-Turn, mid size & exact LP, \TurnMidHands\ hands & value \TurnMidJS\ against \TurnMidLP \\
-Heads-up push or fold & LP on the same tables & values agree to five digits \\
-Parallel partition & sequential solver & values and exploitability agree to $10^{-14}$ relative \\
-Zero-reach shortcut & traversal without shortcut & regrets and sums bit for bit \\
-Leaf evaluation & direct $O(n^2)$ sums & agreement to $10^{-12}$ \\ \bottomrule
-\end{tabular}
-\note{
-Most components have an independent check. The three LP tests build the game separately in Python with explicit chance nodes and solve
-the sequence-form LP exactly, so they test chance weighting, card removal and showdowns together; the remaining differences, $6\times10^{-8}$
-and $1\times10^{-5}$, are within the exploitability left after 20{,}000 and 10{,}000 DCFR iterations. The river row checks the new engine
-against the earlier implementation of the same algorithm: equal iterates, not an independent method. The mid-size turn LP, with 40 and
-35 hands drawn at random, exercises card removal among overlapping hands, ties and chance weighting; its difference \TurnMidDiff\ is within
-the remaining exploitability \TurnMidExpl. Values are compared rather than strategies, because equilibria are not
-unique.\\[3pt]
-A comparison with an established open-source solver on the same flop tree is the natural next test.
-}
-\end{frame}
-
-% =====================================================================================
 \begin{frame}{Why values are compared and strategies are not}
 \begin{block}{Lemma}
 For every pair, $|x^\top Ay-v^\ast|\le\max(g_1,g_2)\le2\ex(x,y)$, where $g_1,g_2$ are the two best-response gains. In particular every
@@ -699,7 +671,7 @@ Equilibrium strategies need not be unique: for $A=\begin{pmatrix}0&1\\0&1\end{pm
 equilibrium, all with value $0$. So DCFR and the LP may return different strategies, but their values must agree within twice the
 remaining exploitability. On the mid-size turn check the difference is \TurnMidDiff\ against an exploitability of \TurnMidExpl.
 \note{
-This lemma is the reason the validation slide reports values. It also bounds the error of every value the solver reports, for example the
+This lemma is the reason the checks against exact linear programs compare values. It also bounds the error of every value the solver reports, for example the
 flop-report averages, by twice the exploitability of each solve.
 }
 \end{frame}
