@@ -84,8 +84,8 @@
   \vspace*{-14pt}\titlepage
 \note{
 \textbf{Timing for 60 minutes.} Problem and equilibria 5 $\cdot$ CFR and DCFR with proofs 11 $\cdot$ Traversal and leaves 10 $\cdot$
-Cost, memory, precision and parallelism 10 $\cdot$ Convergence and value comparison 7.5 $\cdot$ Demonstration 5 $\cdot$
-Extensions and next steps 6 $\cdot$ Questions 5.5.\\[4pt]
+Cost, memory, precision and parallelism 10 $\cdot$ Convergence and validation 9 $\cdot$ Demonstration 5 $\cdot$
+Extensions and next steps 6 $\cdot$ Questions 4.\\[4pt]
 Opening line: ``A poker solver is one numerical method, discounted counterfactual regret minimization, applied to a structured
 bilinear saddle-point problem. This talk is about what makes that method fast and accurate: how an iteration is organized,
 what it costs, how precise it must be and how it is split across processors.''\\[4pt]
@@ -355,8 +355,8 @@ for fixed $c$ the inner sum runs over the $j$ not containing $c$.\hfill$\square$
 \note{
 The conditional probability of the next card depends only on the four known private cards, which are excluded by the indicator and
 by zeroing the opponent's reach. Using $1/(52-|\mathrm{board}|)$ would bias every value.\\[3pt]
-The lemma is checked against exact linear programs with explicit chance nodes, one chance level on the turn and two on the flop:
-the game values agree to six to nine digits.
+The lemma is checked against exact linear programs with explicit chance nodes, one chance level on the turn and two on the flop
+(validation slide).
 }
 \end{frame}
 
@@ -657,6 +657,28 @@ nothing about other ranges or trees.
 
 
 % =====================================================================================
+\begin{frame}{Validation}
+Game values against an exact linear program solved independently:
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+game & hands & DCFR & LP \\ \midrule
+turn & \TurnHands & \TurnJS & \TurnLP \\
+flop & \FlopHands & \FlopJS & \FlopLP \\
+turn & \TurnMidHands & \TurnMidJS & \TurnMidLP \\ \bottomrule
+\end{tabular}
+\end{center}
+Push or fold matches its LP to five digits, the parallel solver matches the sequential one to $10^{-14}$, and the linear-time leaves
+match the direct sums to $10^{-12}$.
+\note{
+The LP tests build each game separately in Python with explicit chance nodes, so they check chance weighting, card removal and showdowns
+together. Each difference is within twice the exploitability left in the DCFR run, as the next slide requires.\\[3pt]
+A further test checks that skipping unreached leaves leaves the regrets and strategy sums unchanged bit for bit. A comparison with an
+established open-source solver on a full flop tree is the natural next test.
+}
+\end{frame}
+
+% =====================================================================================
 \begin{frame}{Why values are compared and strategies are not}
 \begin{block}{Lemma}
 For every pair, $|x^\top Ay-v^\ast|\le\max(g_1,g_2)\le2\ex(x,y)$, where $g_1,g_2$ are the two best-response gains. In particular every
@@ -671,7 +693,7 @@ Equilibrium strategies need not be unique: for $A=\begin{pmatrix}0&1\\0&1\end{pm
 equilibrium, all with value $0$. So DCFR and the LP may return different strategies, but their values must agree within twice the
 remaining exploitability. On the mid-size turn check the difference is \TurnMidDiff\ against an exploitability of \TurnMidExpl.
 \note{
-This lemma is the reason the checks against exact linear programs compare values. It also bounds the error of every value the solver reports, for example the
+This lemma is the reason the validation slide compares values. It also bounds the error of every value the solver reports, for example the
 flop-report averages, by twice the exploitability of each solve.
 }
 \end{frame}
