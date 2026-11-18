@@ -87,7 +87,7 @@
 Cost, memory, precision and parallelism 10 $\cdot$ Convergence and validation 9 $\cdot$ Demonstration 5 $\cdot$
 Extensions and next steps 6 $\cdot$ Questions 4.\\[4pt]
 Opening line: ``A poker solver is one numerical method, discounted counterfactual regret minimization, applied to a structured
-bilinear saddle-point problem. This talk is about what makes that method fast and accurate with how an iteration is organized,
+bilinear saddle-point problem. This talk is about what makes that method fast and accurate: how an iteration is organized,
 what it costs, how precise it must be and how it is split across processors.''\\[4pt]
 Every measured number comes from the experiment scripts listed in \texttt{web/experiments/run\_all.sh}, with logs in \texttt{out/}, through \texttt{tex/make\_talk\_data.py}. The machine is a
 two-core cloud container, so absolute times are pessimistic.
@@ -102,7 +102,7 @@ Programs based on counterfactual regret minimization (CFR) defeated professional
 in 2017 and at six-player hold'em in 2019.
 
 \medskip
-Commercial solvers compute equilibria of user-specified subgames: a board, two ranges and a set of bet sizes.
+Commercial solvers compute equilibria of user-specified subgames with a board, two ranges and a set of bet sizes.
 
 \medskip
 This work builds such a solver on one algorithm, discounted CFR, for the flop, turn and river, with node locking,
