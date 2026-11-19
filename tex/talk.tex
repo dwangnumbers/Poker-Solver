@@ -136,18 +136,17 @@ slide.
 \begin{frame}{The postflop subgame}
 \begin{columns}[T]
 \column{0.5\textwidth}
-Each player holds two private cards. The board has three, four or five public cards, and the remaining cards are dealt
-by chance between betting rounds.
+Each player holds two private cards. The board has three, four or five public cards. The remaining cards are dealt
+between betting rounds.
 
 \pause
 \medskip
-A subgame is given by the board, the pot, the effective stack, a \textbf{range} for each player and a \textbf{bet tree}
-of allowed sizes. A range is a weight vector over the hands that avoid the board: at most 1176 on the flop, 1128 on
-the turn and 1081 on the river.
+A subgame is given by the board, the pot, the effective stack, a \textbf{range} for each player, and a simplified \textbf{bet tree}
+of allowed bet sizes. The range is a vector $r=(r_1,\dots,r_n)$ with $0\leq r_j\leq1$ being the weight given to hand $j$ that avoids the board.
 
 \pause
 \medskip
-The unknowns are an action distribution for every hand at every decision node.
+Technically any bet size is allowed in no-limit hold'em, but simulation becomes too expensive.
 \column{0.48\textwidth}
 \centering
 \begin{tikzpicture}
@@ -173,16 +172,15 @@ with one bet size per street has tens of thousands, because every turn and river
 
 % =====================================================================================
 \begin{frame}{Zero-sum games, equilibrium and exploitability}
-Strategies are probability vectors $x$ and $y$, and player 1's expected payoff is \ $u(x,y) = x^\top A y$.
+Given probability vectors $x$ and $y$ representing each players' respective strategies, player 1's expected payoff is \ $u(x,y) = x^\top A y$.
 \pause
 \begin{block}{Minimax theorem (von Neumann 1928)}
 \[ \max_{x}\ \min_{y}\ u(x,y) \;=\; \min_{y}\ \max_{x}\ u(x,y) \;=\; v^\ast, \quad\text{the value of the game.} \]
 \end{block}
 \pause
-A pair attaining both sides is a Nash equilibrium. Quality is measured by the \textbf{exploitability}, the average gain of
-the two best replies:
+A pair attaining both sides is a Nash equilibrium. The average gain of the two best replies is \textbf{exploitability}:
 \[ \ex(x,y) \;=\; \tfrac12\Big(\underbrace{\max_{x'} u(x',y)}_{\BR_1(y)} \;-\; \underbrace{\min_{y'} u(x,y')}_{\BR_2(x)}\Big) \;\ge\; 0 . \]
-It is reported as a percentage of the pot. \pause With rake the game is not zero-sum, and the theorems below do not apply.
+reported as a percentage of the pot. \pause Unfortunately if rake is considered, the game is no longer zero-sum so the theorems below do not apply.
 \note{
 This is a convex-concave saddle-point problem with bilinear coupling, and the exploitability is the primal-dual gap. Commercial
 solvers stop between 0.1\% and 0.5\% of the pot.\\[3pt]
@@ -195,18 +193,19 @@ With rake, DCFR is used as a heuristic; the measured exploitability is still rep
 
 % =====================================================================================
 \begin{frame}{Regret matching and counterfactual regret minimization}
-At every information set $I$, CFR keeps a running regret for each action $a$, how much better $a$ would have done:
+\small
+At every information set $I$, CFR compares the value of our current strategy against a potential action $a$
 \[ R_T(I,a) \;=\; \sum_{t=1}^{T} \big(\, v_t(I,a) - v_t(I) \,\big), \]
 and plays each action in proportion to its positive part $\pos R=\max(R,0)$:
 \[ \Pr\nolimits_{T+1}(a\mid I) \;=\; \pos{R_T(I,a)}\ \Big/ \ \textstyle\sum_b \pos{R_T(I,b)} . \]
-\pause The values $v_t$ are \textbf{counterfactual}: weighted by the chance and opponent reach of $I$.
+\pause The values $v_t$ are \textbf{counterfactual}: weighted by the probability that the dealer's and opponents' actions reach $I$.
 \pause
-\begin{block}{Theorem (Zinkevich, Johanson, Bowling and Piccione 2007)}
+\vspace{-3pt}\begin{block}{Theorem (Zinkevich, Johanson, Bowling and Piccione 2007)}
 The average strategies satisfy \quad $\ex(\bar x_T,\bar y_T) \ \le\ \Delta\,|\mathcal I|\,\sqrt{|A|}\,\big/\sqrt T$,\\[2pt]
 {\footnotesize where $\Delta$ is the largest regret change and $|\mathcal I|$ the number of information sets.}
 \end{block}
 \pause
-The bound guarantees convergence; at practical $T$ it is vacuous.
+The bound guarantees convergence but at a real-world number of information sets it requires impractical numbers of iterations.
 \note{
 For the flop spot $|\mathcal I|\approx\FlopInfosets$, so the bound exceeds the pot by many orders of magnitude at any feasible $T$.\\[3pt]
 Regret matching (Hart and Mas-Colell 2000) keeps the maximal regret of order $\sqrt T$ by Blackwell approachability: the
@@ -230,7 +229,8 @@ If every regret change satisfies $|r_t(a)|\le\Delta$, then after $T$ rounds \qua
 \textbf{Proof.} Track the squared length of the positive regrets, \quad $\Phi_t=\sum_a \big(\pos{R_t(a)}\big)^2$.
 \small
 \begin{enumerate}[<+->]\setlength\itemsep{3pt}
-\item \textbf{Balance.} Regret is measured against what was played, and play is proportional to $\pos{R_{t-1}}$, so
+\item \textbf{Balance.} Instantaneous regret is measured against what was played before proportionally to $\pos{R_{t-1}}$. Our current regret
+chooses a new strategy orthogonal to earlier regret.
 \[ \textstyle\sum_a \Pr\nolimits_t(a)\, r_t(a)=0 \qquad\text{and}\qquad \sum_a \pos{R_{t-1}(a)}\, r_t(a)=0 . \]
 \item \textbf{Square inequality.} For all real $x$ and $r$: \ $\big(\pos{(x+r)}\big)^2 \le (\pos x+r)^2$ \ (check $x+r\le0$, $x\ge0$, $x<0<x+r$).
 \item \textbf{Growth.} Expanding the square, the cross term vanishes by step 1:
@@ -255,15 +255,15 @@ If the two players' average regrets after $T$ rounds are at most $\varepsilon_1$
 $\bar x,\bar y$ satisfy \quad $\ex(\bar x,\bar y)\ \le\ \tfrac12(\varepsilon_1+\varepsilon_2)$.
 \end{block}
 \pause
-\textbf{Proof.} The payoff is linear, so playing against the opponent's sequence of strategies is the same as playing against
-his average. With $\bar U$ the average payoff actually received, the regret bounds become
+\textbf{Proof.} Playing against a sequence of strategies is the same as playing against the average strategy from that
+sequence. With $\bar U$ the average payoff actually received, the regret bounds become
 \[ \BR_1(\bar y)-\bar U\ \le\ \varepsilon_1, \qquad\qquad \bar U-\BR_2(\bar x)\ \le\ \varepsilon_2 . \]
 Add the two and halve.\hfill$\square$
 
 \pause
-\textbf{CFR.} In a tree a player's total regret splits over her information sets:
+\textbf{CFR.} In a tree a player's total regret splits over their information sets
 \[ \text{total regret}\ \le\ \textstyle\sum_I \max_a \pos{R_T(I,a)}\ \le\ |\mathcal I|\,\Delta\sqrt{|A|T} . \]
-This proves the CFR theorem; letting $T\to\infty$ also proves the minimax theorem.
+which proves the CFR theorem. Dividng by $T$ to get average regret and letting $T\to\infty$ also proves the minimax theorem!
 \note{
 The decomposition identity is a telescoping sum over the information sets of the player, using that her own reach is the same at every
 history of an information set (perfect recall). The study guide writes out the telescoping and checks it on a two-decision example.\\[3pt]
@@ -287,15 +287,15 @@ strategy sum & $\big(t/(t+1)\big)^2$ & $\text{reach}(I)\times\Pr\nolimits_t(a\mi
 \end{tabular}
 \end{center}
 \pause
-\small These are the parameters $(\alpha,\beta,\gamma)=(1.5,0,2)$. CFR shrinks nothing; CFR$^+$ zeroes negative regrets and weights
-iteration $t$ by $t$. Players are updated alternately.
+\small These are the parameters $(\alpha,\beta,\gamma)=(1.5,0,2)$ from Brown and Sandholm's 2019 computed benchmarks. CFR does not
+shrink past regrets, meaning older information is given equal weight.
 \pause
-\begin{block}{Theorem (Brown and Sandholm 2019)}
+\vspace{-3pt}\begin{block}{Theorem (Brown and Sandholm 2019)}
 With simultaneous updates, the weighted averages after $T$ iterations are an $\varepsilon$-equilibrium with $\varepsilon$ of order
-$\Delta\,|\mathcal I|\sqrt{|A|}\,/\sqrt T$: the same rate as CFR.
+$\Delta\,|\mathcal I|\sqrt{|A|}\,/\sqrt T$, the same rate as CFR.
 \end{block}
 \pause
-Unreachable subtrees are still visited, so the iterates are exact.
+Unreachable subtrees are still traversed to discount their outdated regrets for when those information sets are reached.
 \note{
 The exact bound of the theorem is $\varepsilon=6\Delta|\mathcal I|\big(\sqrt{|A|}+1/\sqrt T\big)/\sqrt T$.\\[3pt]
 
@@ -324,7 +324,7 @@ For the sum, use $1^2+2^2+\dots+N^2=\tfrac{N(N+1)(2N+1)}6$ and divide by $(T+1)^
 \pause
 \textbf{Regrets.} From iteration $k$ on, a positive regret keeps at least the fraction
 \[ \textstyle\prod_{t>k}\big(1-t^{-1.5}\big)\ \ge\ 1-\sum_{t>k}t^{-1.5}\ \ge\ 1-2/\sqrt k , \]
-while a negative regret is halved every iteration. Good actions are remembered, bad ones forgotten.
+while a negative regret is halved every iteration so that beneficial actions are remembered while bad ones are forgotten.
 \note{
 Example of the weights: for $T=4$ they are $0.16$, $0.36$, $0.64$ and $1$, so the last iteration has 46\% of the average and the first 7\%.
 For $T=100$ the first iteration has about $0.001\%$.\\[3pt]
@@ -340,30 +340,28 @@ Brown--Sandholm theorem. The growth $S_T\approx T/3$ is used on the precision sl
 \begin{frame}{Range-vectorized traversal of the public tree}
 \begin{columns}[T]
 \column{0.55\textwidth}
-The \textbf{public tree} has one node per betting sequence and dealt card. At a public node, the acting player has one
-information set per hand, so every quantity is a vector over hands.
+\small
+The \textbf{public tree} contains one node per public betting history and board card. At each node, the acting player has one
+information set per private hand, so all quantities are stored as vectors over hands.
 
 \pause
 \medskip
-A traversal for player $p$ carries one vector down and one up:
+A traversal for player $p$ passes one vector down and returns one vector up:
 \begin{itemize}\setlength\itemsep{1pt}
-\item $q$: the opponent's reach, one entry per opponent hand;
-\item $v$: player $p$'s values, one entry per own hand.
+\item $q$: the opponent's reach probabilities (one entry per opponent hand);
+\item $v$: player $p$'s counterfactual values (one entry per own hand).
 \end{itemize}
-A decision with $|A|$ actions costs $O(n|A|)$ operations.
-
-\pause
-\medskip
-Regrets and strategy sums are stored action by action, so the inner loops run over hands.
+A decision node with $|A|$ actions costs $O(n|A|)$ operations. \pause Regrets and strategy sums are stored action-major
+([action][hand]), so inner loops iterate over contiguous hand vectors.
 \column{0.43\textwidth}
 \pause
 \begin{block}{One traversal for player $p$}
-\small
-\textbf{Opponent node:} send $q\odot\Pr(a\mid\text{hand})$ to each child $a$ and add the child values.\\[3pt]
-\pause \textbf{Own node:} combine $v=\sum_a\Pr(a\mid\text{hand})\odot v_a$ and update the regrets and strategy sums.\\[3pt]
-\pause \textbf{Chance node:} average the children over the dealt cards.\\[3pt]
-\pause \textbf{Leaf:} return the payoff against $q$.\\[2pt]
-{\footnotesize $\odot$ multiplies entry by entry.}
+\footnotesize
+\textbf{Opponent node:} Pass $q \odot \Pr(a \mid \text{hand})$ down to each child action $a$, and sum the returned child value vectors.\\[3pt]
+\pause \textbf{Own node:} Recurse on all actions, compute $v = \sum_a \Pr(a \mid \text{hand}) \odot v_a$, and update regrets and strategy sums.\\[3pt]
+\pause \textbf{Chance node:} Average the child value vectors across all valid dealt cards.\\[3pt]
+\pause \textbf{Leaf:} Compute and return player $p$'s payoff vector against $q$.\\[2pt]
+{\footnotesize $\odot$ denotes element-wise multiplication.}
 \end{block}
 \end{columns}
 \note{
