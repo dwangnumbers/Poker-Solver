@@ -1,339 +1,357 @@
 \documentclass{article}
-\usepackage[paperwidth=3.6in,paperheight=6.4in,left=0.17in,right=0.17in,top=0.16in,bottom=0.16in]{geometry}
+\usepackage[paperwidth=3.6in,paperheight=7.8in,left=0.16in,right=0.16in,top=0.15in,bottom=0.15in]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[scaled=1]{helvet}
 \renewcommand{\familydefault}{\sfdefault}
-\usepackage{amsmath,amssymb,xcolor,enumitem}
+\usepackage{amssymb,xcolor,enumitem}
 \hyphenpenalty=10000\exhyphenpenalty=10000
 \pagestyle{empty}
 \setlength{\parindent}{0pt}\setlength{\parskip}{0pt}
-\definecolor{bar}{HTML}{1F2A44}\definecolor{ck}{HTML}{D2540B}\definecolor{dim}{HTML}{555555}
+\definecolor{bar}{HTML}{1F2A44}\definecolor{ck}{HTML}{D2540B}\definecolor{why}{HTML}{1E6B52}\definecolor{dim}{HTML}{555555}
 \newcommand{\SP}{\ensuremath{\spadesuit}}
 % \slide{number}{title}{minutes}{clicks}
 \newcommand{\slide}[4]{\clearpage
-  \noindent\colorbox{bar}{\parbox{\dimexpr\linewidth-2\fboxsep}{\color{white}\fontsize{14}{16}\selectfont
-  \textbf{\fontsize{22}{24}\selectfont #1}\,/\,34\hfill #3\ifx&#4&\else\ \ \ \textcolor{ck!40!white}{\ensuremath{\blacktriangleright}}\,#4\fi\\[2pt]
-  \raggedright\textbf{\fontsize{16.5}{19}\selectfont #2}}}\par\vspace{5pt}
-  \fontsize{18.5}{21.5}\selectfont\raggedright}
-\setlist[itemize]{leftmargin=13pt,labelsep=4pt,itemsep=4pt,topsep=0pt,parsep=0pt}
+  \noindent\colorbox{bar}{\parbox{\dimexpr\linewidth-2\fboxsep}{\color{white}\fontsize{13}{15}\selectfont
+  \textbf{\fontsize{21}{23}\selectfont #1}\,/\,34\hfill #3\ifx&#4&\else\ \ \ \textcolor{ck!40!white}{\ensuremath{\blacktriangleright}}\,#4 click\ifnum#4>1 s\fi\fi\\[2pt]
+  \raggedright\textbf{\fontsize{15}{17.5}\selectfont #2}}}\par\vspace{5pt}
+  \fontsize{15}{17.8}\selectfont\raggedright}
+\setlist[itemize]{leftmargin=12pt,labelsep=4pt,itemsep=4pt,topsep=0pt,parsep=0pt}
 \newcommand{\pt}{\item[\textbullet]}
 \newcommand{\ck}{\item[\textcolor{ck}{\ensuremath{\blacktriangleright}}]}
+\newcommand{\why}{\textcolor{why}{\textbf{Why:}} }
 \newcommand{\cue}[1]{{\color{dim}\itshape #1}}
 \begin{document}
 
 %======================================================================
 \slide{1}{Title}{1 min}{}
 \begin{itemize}
-\pt Thank you for coming.
-\pt Claim: a poker solver is one numerical method, discounted CFR, applied to one structured optimization problem.
-\pt The algorithm fits on one slide. The real question is what makes one step fast and accurate.
-\pt How is a step organized? What does it cost? How much precision? How do we split it across processors?
-\pt I built a solver to measure all this. Live demo later.
+\pt Main claim: a poker solver is one numerical method, discounted CFR, applied to one optimization problem.
+\pt The method fits on one slide, so the interesting part is making each step fast and accurate: how a step is organized, what it costs, how much precision it needs, how to split it across processors.
+\pt \why those are the standard questions of numerical analysis, which is why the talk fits this club.
+\pt I built my own solver so every number in the talk is something I measured.
 \end{itemize}
 
 %======================================================================
 \slide{2}{Background and scope}{1 min}{2}
 \begin{itemize}
-\pt CFR programs beat pros: heads-up in 2017, six players in 2019.
-\ck Commercial solvers: give a board, two ranges, bet sizes; get the equilibrium.
-\ck Mine: the same in a browser, one algorithm (DCFR), flop to river, plus locking, reports, preflop.
-\pt Picture: green = check, red = bet, split = mixes.
+\pt 2017: Libratus and DeepStack beat professionals at heads-up no-limit. 2019: Pluribus beat them at six players. All are built on CFR.
+\ck Commercial solvers (PioSOLVER, for example) solve one spot at a time. The user supplies the board, both ranges and the allowed bet sizes. \why the full game is far too large to solve directly.
+\ck Mine does the same in a web browser with one algorithm throughout. \why with one algorithm, the analysis in the talk covers every feature.
+\pt The picture: each square is a starting hand, colored by how often it checks (green) or bets (red). Mixed squares are normal: mixing is how an equilibrium keeps bluffs balanced.
 \end{itemize}
 
 %======================================================================
 \slide{3}{The postflop subgame}{1.5 min}{2}
 \begin{itemize}
-\pt 2 private cards each; 3, 4 or 5 public cards.
-\ck Subgame: board, pot, stack, a \textbf{range} per player, a \textbf{bet tree}.
-\pt Range = a weight from 0 to 1 for every hand.
-\ck Any size is legal, but we allow only a few, or the game is too big.
-\pt K72: river 17 decisions, turn 1,349, flop 56,842.
+\pt Each player has two hidden cards. The board shows three cards (flop), then four (turn), then five (river), with betting after each.
+\ck A subgame is fixed by the board, pot, stack, one range per player and a bet tree.
+\pt A range gives every possible hand a weight between zero and one. \why you never know the opponent's hand, only how likely each hand is given the earlier betting.
+\pt Ranges have up to 1,176 hands on the flop and 1,081 on the river: every pair of cards that avoids the board.
+\ck \why a bet tree: no-limit allows any bet size, which makes the game effectively infinite. Allowing only a few sizes makes it finite.
+\pt Table: river 17 decisions, turn 1,349, flop 56,842. The flop is huge because every turn card and every river card gets its own copy of the later betting.
 \end{itemize}
 
 %======================================================================
 \slide{4}{Zero-sum games, equilibrium, exploitability}{1.5 min}{3}
 \begin{itemize}
-\pt My payoff $x^\top A y$ is linear in each strategy.
-\ck Minimax: max-min = min-max = the value of the game.
-\ck That pair is a Nash equilibrium. \textbf{Exploitability}: average gain of the two best replies. Zero at equilibrium; 0.3\% of pot = solved.
-\ck With rake it is not zero-sum: theorems don't apply.
+\pt My winnings are linear in my strategy and in yours (the ``sequence form'' of a game tree).
+\ck Minimax theorem: who commits first doesn't matter; the guaranteed amount, the value of the game, is the same. \why winnings are linear in each strategy and the strategy sets are convex.
+\ck Equilibrium: neither player gains by changing alone. Exploitability is the average of how much each player could gain by switching to their best reply.
+\pt \why it's a good error measure: it's measured in chips, it's zero exactly at equilibrium, and you can compute it without knowing the answer. 0.3\% of the pot is the usual ``solved'' standard.
+\ck Rake: the house takes a cut, so the game isn't zero-sum and the theorems don't apply.
 \end{itemize}
 
 %======================================================================
 \slide{5}{Regret matching and CFR}{2.5 min}{3}
 \begin{itemize}
-\pt Regret of $a$: how much better $a$ did than what I played, summed.
-\pt Play each action in proportion to its positive regret.
-\ck \textbf{Counterfactual}: weighted by dealer's and opponent's reach.
-\ck Theorem (2007): error shrinks like $1/\sqrt{T}$.
-\ck But the constant is huge: useless at real sizes.
+\pt Regret of an action (given my hand and the public history): summed over iterations, how much better it would have done than what I played.
+\pt Play actions in proportion to positive regret. \why it moves toward what would have worked; no step size to tune.
+\ck Counterfactual: weighted by the chance that the cards and the opponent lead here, not my own choices. \why each information set then learns on its own, and the pieces add up.
+\ck Theorem (2007): the average strategy's exploitability shrinks like one over the square root of the iteration count.
+\ck \why the bound is useless in practice: it scales with the number of information sets (tens of millions on a flop), so it promises 0.3\% only after absurdly many iterations; in practice about a hundred.
 \end{itemize}
 
 %======================================================================
-\slide{6}{Proof of the $\sqrt T$ bound}{2 min}{4}
+\slide{6}{Proof of the square-root bound}{2 min}{4}
 \begin{itemize}
-\pt Claim: max regret $\le \Delta\sqrt{|A|T}$.
-\ck $\Phi$ = sum of squared positive regrets. Step 1: the new regret averages to zero under the strategy played, which is proportional to the old positive regrets. Cross term = 0.
-\ck Step 2: positive part squared $\le$ square.
-\ck Step 3: $\Phi$ grows $\le |A|\Delta^2$ per round.
-\ck Step 4: square root. Done.
+\pt Claim (Hart and Mas-Colell, 2000): under regret matching, the largest regret grows at most like the square root of the number of rounds.
+\ck Track one number: the sum of squared positive regrets. Step 1: the strategy played is proportional to the old positive regrets, and the new regret averages to zero under the strategy played. So the new regret is orthogonal to the old positive regrets and the cross term vanishes.
+\ck Step 2: cutting negatives off at zero can only make a square smaller. Check three cases.
+\ck Step 3: so each round the sum grows by at most the number of actions times the largest change squared.
+\ck Step 4: after many rounds the largest regret is at most the square root of that total. \why it matters: regret per round then goes to zero.
 \end{itemize}
 
 %======================================================================
-\slide{7}{Small regret $\Rightarrow$ approximate equilibrium}{2 min}{2}
+\slide{7}{Small regret means near equilibrium}{2 min}{2}
 \begin{itemize}
-\pt Lemma: average regrets $\varepsilon_1,\varepsilon_2$ give exploitability at most $\tfrac12(\varepsilon_1+\varepsilon_2)$.
-\ck Proof: payoff is linear, so playing against a sequence is playing against its average. The two regret bounds sandwich the average payoff. Add and halve.
-\ck CFR: total regret splits over information sets, each with the $\sqrt T$ bound. Divide by $T$: goes to zero.
-\pt Bonus: this also proves the minimax theorem.
+\pt Lemma: if both players' average regrets are small, their average strategies are nearly an equilibrium. Exploitability is at most the average of the two regrets.
+\ck \why winnings are linear in the opponent's strategy, so a best reply to his average strategy earns the average of what it would have earned each round. Regret compares that with what I actually earned. Do the same for him, add, and halve.
+\ck CFR: total regret in the tree is at most the sum of the regrets at each information set. Each obeys the square-root bound, so average regret goes to zero, and so does exploitability.
+\pt Bonus: we can make exploitability as small as we like, so max-min must equal min-max. That proves the minimax theorem.
 \end{itemize}
 
 %======================================================================
 \slide{8}{Discounted CFR}{2.5 min}{3}
 \begin{itemize}
-\pt Before adding iteration $t$, DCFR shrinks what it has stored: positive regrets slightly, negative regrets by half, strategy sums by $(t/(t+1))^2$.
-\ck Parameters (1.5, 0, 2) from Brown and Sandholm 2019. Plain CFR weights old information equally.
-\ck Theorem: same $1/\sqrt T$ rate as CFR.
-\ck Unreachable subtrees are still visited, so their outdated regrets get discounted too.
+\pt Each iteration DCFR first shrinks its stored totals, then adds the new ones: positive regrets slightly, negative regrets by half, the strategy sum by a factor approaching one.
+\pt \why early iterations are poor guesses, and discounting lets the solver forget them. Halving negative regrets lets an action that looked bad early recover quickly.
+\ck The parameters 1.5, 0 and 2 are the combination Brown and Sandholm found best in their 2019 benchmarks. Plain CFR weights every iteration equally.
+\ck Theorem: the same worst-case rate as CFR. So the speedup is measured, not proven.
+\ck Subtrees nobody reaches are still visited so their old regrets keep being discounted. If play reaches them later, they aren't stuck with stale numbers. It costs time; pruning would help.
 \end{itemize}
 
 %======================================================================
 \slide{9}{What the discounts do}{2 min}{2}
 \begin{itemize}
-\pt Lemma: iteration $k$ has weight $\big(\tfrac{k+1}{T+1}\big)^2$ in the average. Recent iterations count most.
-\ck Proof: the shrink factors telescope to $\tfrac{k+1}{T+1}$; square it. The sum of squares formula gives growth like $T/3$.
-\ck Regrets: a positive regret keeps at least $1-2/\sqrt k$ of itself. A negative one halves every iteration.
-\pt So good actions are remembered and bad ones forgotten.
+\pt Lemma: an iteration's weight in the final average grows with the square of how late it came. Recent iterations dominate. The total grows like a third of the iteration count.
+\ck \why each later iteration multiplies by the same kind of factor, and the product telescopes: all the middle terms cancel. The total then follows from the sum-of-squares formula.
+\ck Regrets: from any moderately late iteration on, a positive regret keeps almost all of itself. A negative regret is halved every iteration, so it is gone after a few.
+\pt \why that's good: good actions build up evidence, and a bad early judgment can't block an action that becomes good.
 \end{itemize}
 
 %======================================================================
 \slide{10}{Range-vectorized traversal}{2 min}{6}
 \begin{itemize}
-\pt One node per betting history and board card; everything is a vector over hands.
-\ck Down: opponent reach $q$. Up: my values $v$.
-\ck Stored [action][hand]: contiguous loops.
-\ck Opponent node: scale $q$, pass down, add up.
-\ck Own node: mix children, update regrets.
-\ck Chance node: average over cards.
-\ck Leaf: payoff vector.
+\pt The public tree has one node per public history of bets and cards. Each node holds a list of numbers, one per hand. \why a tree split by hands would be about a thousand times bigger.
+\ck Down: the opponent's reach, per hand. Up: my value, per hand. A decision costs hands times actions.
+\ck Stored action by action, hands contiguous. \why loops read memory in order.
+\ck Opponent node: scale his reach by his action probabilities, recurse, add up.
+\ck Own node: get each action's values, mix them by my strategy, and update regrets and the strategy sum.
+\ck Chance node: average over the dealt cards (next slide).
+\ck Leaf: fold or showdown payoffs (slides 12 and 13).
 \end{itemize}
 
 %======================================================================
 \slide{11}{Chance nodes}{2 min}{2}
 \begin{itemize}
-\pt With both hands known, $K = 48 - $ (board cards) remain. Each is equally likely: probability $1/K$.
-\ck So a chance node is a plain average of its children. The child for card $c$ first removes opponent hands containing $c$.
-\ck Proof: the shuffle makes unseen cards equally likely. Write the value as a double sum, then swap the order: one child per card.
+\pt Once both hands are known, the cards left are 48 minus the board: 45 on the flop, 44 on the turn. Each is equally likely to come next.
+\ck So a chance node is a plain average of its children. The child for each card first removes opponent hands that contain that card.
+\pt \why no special weighting is needed: given both hands, every unseen card is equally likely, and card removal is handled by dropping hands.
+\ck Proof: the value is a sum over opponent hands and next cards, all with the same weight. Swap the order of the two sums and you get one child per card, each over the hands that avoid it.
 \end{itemize}
 
 %======================================================================
 \slide{12}{Fold leaves in linear time}{2 min}{1}
 \begin{itemize}
-\pt I need the opponent's weight on hands that share no card with mine.
-\pt Total weight, minus his weight on my first card, minus on my second card, plus back my exact hand, which was subtracted twice.
-\pt 52 card sums. One pass each way: linear, not quadratic.
-\ck Matrix form: all pairs, minus pairs sharing a card, plus identical hands.
+\pt At a fold the payoff is fixed. My value is that payoff times the opponent's weight on hands that share no card with mine (blockers).
+\pt Done naively that's about a thousand of my hands times a thousand of his: a million steps.
+\pt Trick: start from his total weight, subtract his weight on hands with my first card, subtract his weight on hands with my second card, and add back my exact hand, which was subtracted twice. The 52 per-card totals are computed once.
+\pt \why it's exact: only my identical hand shares both cards, so it's the only thing counted twice.
+\pt One pass over his hands and one over mine, so the cost grows linearly, not quadratically.
+\ck Matrix view: ``all pairs'' minus ``pairs sharing a card'' plus ``identical hands.'' That structure is why it's cheap.
 \end{itemize}
 
 %======================================================================
 \slide{13}{Showdown leaves in linear time}{2 min}{1}
 \begin{itemize}
-\pt Sort hands by strength once per runout. One sweep gives the weight I beat, and the weight I beat or tie.
-\pt Same inclusion--exclusion for blockers. Sort is cached, so each evaluation is linear.
-\ck Table: at 1,081 hands, 13.7\,$\mu$s against 4,272 for the direct sum, about 300 times faster. They agree to $10^{-12}$.
+\pt Sort hands by strength once per final board. Sweep from weakest to strongest, keeping a running total of the opponent weight below. That gives the weight each hand beats, and the weight it beats or ties.
+\pt Blockers use the same subtraction as at folds, with the per-card totals tracked during the sweep.
+\pt \why the sort costs nothing per iteration: the board is fixed at a leaf, so the strength order never changes. It's computed once and cached.
+\ck Table: with 1,081 hands, 13.7 microseconds against 4,272 for the direct sum, about 300 times faster. The two agree to about 12 digits.
 \end{itemize}
 
 %======================================================================
 \slide{14}{A cost model for one iteration}{2.5 min}{1}
 \begin{itemize}
-\pt Time $\approx$ $a\cdot$(decision work) $+$ $b\cdot$(showdown work). Decision work = hands $\times$ actions, summed.
-\ck Fit to 252 timed iterations of 8 trees: $a = 30$\,ns, $b = 17$\,ns. One core.
-\pt Held out: 7--10\% error on the two largest flop trees, 30\% at worst.
-\pt On 22 new random-board trees: median error 8\%, worst 20\%.
+\pt Time is roughly a constant times the decision work plus a constant times the showdown work. Decision work is hands times actions, summed over decisions. Showdown work is the number of hands at showdowns.
+\pt \why two terms: these are the two loops that dominate. Folds and chance nodes are smaller, and their cost is absorbed into the two constants.
+\ck Fitted on 252 timed iterations of 8 trees: about 30 nanoseconds per hand-action and 17 per showdown hand, on one core.
+\pt Tested on trees left out of the fit: 7 and 10\% error on the two largest flops, 30\% at worst. On 22 new random-board trees never used in the fit: median 8\%, worst 20\%.
+\pt \why it matters: it predicts solve time before building. Combined with the iteration counts (slide 20), it gives total time.
 \end{itemize}
 
 %======================================================================
 \slide{15}{Memory}{1 min}{1}
 \begin{itemize}
-\pt Memory = 8 bytes $\times$ hands $\times$ actions, over all decisions. 4 bytes regret + 4 bytes strategy sum.
-\pt Flat blocks of $2^{24}$ entries: a 2.9\,GB tree now allocates in under a second instead of 32.
-\ck Estimate before building from the top of the tree and one card's subtree. Within 0.1\% on the three trees we built. Larger ones unverified.
+\pt Each decision stores a regret and a strategy sum for every hand and action, 4 bytes each, so memory is 8 bytes times hands times actions.
+\pt Storage is a few big flat blocks (about 16.7 million entries each) instead of millions of small arrays. \why allocating many small arrays is slow: a 2.9\,GB tree went from 32 seconds to under one.
+\ck Estimated before building from the top of the tree plus one card's subtree. \why every card's subtree is the same size.
+\pt Within 0.1\% on the three trees we built. The larger estimates (1.5 to 3.6\,GB) weren't built, so they're unverified.
+\pt Table: adding sizes, raises and all-in takes the flop from 431\,MB to 3.6\,GB.
 \end{itemize}
 
 %======================================================================
 \slide{16}{Floating-point precision}{2 min}{1}
 \begin{itemize}
-\pt Regrets and strategy sums stored in single precision. Arithmetic in double.
-\ck All four single/double combinations reach the same exploitability.
-\pt Strategies differ slightly, but double-precision runs with ranges changed by $10^{-7}$ differ just as much.
-\pt So the difference is the sensitivity of the DCFR path, not storage precision.
+\pt Regrets and strategy sums are stored in single precision, which halves memory. All arithmetic is in double.
+\ck Tried all four mixes of single and double. All reach the same exploitability, down to 0.0002\% of the pot.
+\pt Their strategies differ by under 1\%. But two double-precision runs whose ranges differ by one part in ten million differ just as much.
+\pt \why that matters: the difference comes from DCFR's path being sensitive to tiny nudges, not from storage. Equilibria often aren't unique, so mixing frequencies can drift. Values and exploitability are what's stable (slide 23).
 \end{itemize}
 
 %======================================================================
 \slide{17}{Rounding error in the strategy sums}{2 min}{2}
 \begin{itemize}
-\pt Lemma: shrink-then-add in floating point. After $T$ steps the error is at most $2Tu$ times the sum.
-\ck Proof. Each step adds a new error of at most $2u$ times the current sum: two operations.
-\pt Unroll. Old sums only shrink, so each term is at most $2u\,S_T$. $T$ terms.
-\ck Strategy = ratio of two sums: about $4Tu$. Single precision, 200 iterations: $5\times10^{-5}$.
+\pt Lemma: shrink a running total, then add something nonnegative, in floating point. The relative error is at most about twice the number of steps times the rounding unit.
+\pt In single precision the rounding unit is about one part in 17 million.
+\ck Proof: each step's two operations (multiply, add) each add a tiny relative error. Older errors get shrunk later. Terms are never negative, so an older total can't exceed the final one, which bounds every step's error.
+\ck The strategy is a ratio of two such totals, so the errors add: about four times steps times rounding unit. After 200 iterations that's 0.005\%, far below anything that matters.
+\pt \why nonnegativity matters: there's no cancellation, so the error stays small relative to the total.
 \end{itemize}
 
 %======================================================================
 \slide{18}{Parallel partition}{2 min}{4}
 \begin{itemize}
-\pt Below the first chance node, each card's subtree is independent. Cards go round-robin to $P$ workers; a coordinator keeps the top.
-\pt 1. Coordinator records reach vectors.
-\ck 2. Workers return summed child values.
-\ck 3. Coordinator divides by $K$ and finishes.
-\ck Time $\approx$ coordinator $+$ $\lceil K/P\rceil\times$ one card.
-\ck Table, Chrome: flop 2,317\,ms $\to$ 1,212\,ms with 2 workers, speedup 1.9. Turn 1.8.
+\pt Below the first chance node (the turn card), each card's subtree is independent given the incoming reach. Cards go round-robin to workers; a coordinator keeps the flop betting.
+\pt Step 1: coordinator records both players' reach.
+\ck Step 2: each worker solves its cards and returns their summed values.
+\ck Step 3: coordinator adds, divides by the number of cards, finishes.
+\pt \why exact: a chance node is an average and sums add, so the arithmetic is the same as sequential. Matches to 14 digits.
+\ck Time model: coordinator time plus cards per worker (rounded up) times time per card.
+\ck Table (Chrome): flop 2,317\,ms to 1,212\,ms with 2 workers, 1.9 times faster; turn 1.8. Messages at most 44\,kB. Only two cores tested.
 \end{itemize}
 
 %======================================================================
-\slide{19}{Convergence of CFR, CFR$^+$, DCFR}{2 min}{1}
+\slide{19}{Convergence of CFR, CFR-plus, DCFR}{2 min}{1}
 \begin{itemize}
-\pt Exploitability against iterations on the three example spots. Log scale. Dashed line = 0.3\% target.
-\pt DCFR is fastest.
-\ck On random boards, DCFR beat CFR$^+$ to 0.3\% on 49 of 50 river and 40 of 40 turn boards. Sign test $p<10^{-6}$.
-\pt It beat plain CFR on all of them.
+\pt Exploitability against iterations on the river, turn and flop example spots. Log scale; the dashed line is the 0.3\% target.
+\pt CFR-plus (Tammelin, 2014) clips regrets at zero and weights recent iterations more. DCFR is fastest on all three spots.
+\ck On random boards DCFR reached 0.3\% before CFR-plus on 49 of 50 river boards and 40 of 40 turn boards (one size). The sign test gives under one in a million by chance. DCFR also beat plain CFR on every board.
+\pt \why a sign test: it assumes nothing about how much faster; it only counts wins.
 \end{itemize}
 
 %======================================================================
 \slide{20}{Iterations to a fixed accuracy}{2 min}{1}
 \begin{itemize}
-\pt Random boards; table shows medians with 95\% intervals.
-\pt To 0.3\%: river 16, turn 47, flop 97 with one size. Two sizes: river 47, turn 114.
-\ck Count grows with the \textbf{betting}, not the tree size: the second size and raise multiply it by 2.9 on the river, 2.5 on the turn.
-\pt Graph: one dot per board, bar = median.
-\pt 95\% confident: at least 86\% of flops need at most 126.
+\pt Uniformly random boards, same ranges. One size means check or bet 75\%, no raises. Two sizes means bets of 33\% or 75\% and a 50\% raise.
+\pt Median iterations to 0.3\%: river 16 (one size) and 47 (two sizes), turn 47 and 114, flop 97 (one size).
+\ck The count grows with the betting, not the tree size. The extra size and raise multiply it by 2.9 on the river and 2.5 on the turn. A one-size turn (580 decisions) and a two-size river (10 decisions) both need 47.
+\pt \why it matters: iterations barely grow, so the cost per iteration (tree size) decides the running time.
+\pt With 95\% confidence, at least 86\% of flops need at most 126 iterations.
+\pt Graph: each dot is a board, the bar is the median, log scale.
 \end{itemize}
 
 %======================================================================
 \slide{21}{Distribution-free statements}{2 min}{3}
 \begin{itemize}
-\pt Solver is deterministic: the only randomness is the board. So counts are independent draws.
-\ck Lemma: each count falls below the median with probability $\tfrac12$, like a coin flip. That gives an exact interval for the median.
-\ck Proof: count how many fall below; that is binomial.
-\ck 20 flops: 96\% coverage. Worst-of-$n$: $p^n$. Sign test: 40 of 40 wins is $2^{-39}$ for a fair coin.
-\pt No distribution is assumed.
+\pt The solver is deterministic, so the only randomness is the board: counts are independent draws from one unknown distribution.
+\ck Lemma: each count falls below the true median with probability one half, like a coin flip. So the number below is binomial, which gives the exact coverage of the interval from sixth smallest to sixth largest.
+\ck Proof: the interval misses only if too few counts fall below the median, or too few above: coin-flip tails.
+\ck 20 flops: 96\% coverage. All 20 land below the 86th percentile only 5\% of the time, so with 95\% confidence 86\% of flops need at most the worst seen. Sign test: 40 wins out of 40 has odds of about one in 550 billion for a fair coin.
+\pt \why distribution-free: counts are skewed whole numbers; no normality needed. Ties only make it conservative. Covers only these ranges and menus.
 \end{itemize}
 
 %======================================================================
 \slide{22}{Validation}{1.5 min}{1}
 \begin{itemize}
-\pt Game values against an exact linear program solved independently.
-\pt They agree to 6--8 digits on three small games. The mid-size turn matches to every digit shown.
-\ck Push or fold matches its LP to 5 digits. Parallel matches sequential to $10^{-14}$. Fast leaves match direct sums to $10^{-12}$.
+\pt Game values compared with an exact linear program (the sequence-form LP) on three small games, of up to 40 hands per player.
+\pt Turn agrees to 8 digits, flop to 7, and the mid-size turn matches every digit shown.
+\pt \why an LP: it finds the exact equilibrium by a completely different method, so agreement checks the whole pipeline: tree, leaves and card removal.
+\ck Push or fold matches its LP to 5 digits. Parallel matches sequential to 14 digits (only the rounding order differs). Fast leaves match direct sums to 12 digits.
 \end{itemize}
 
 %======================================================================
 \slide{23}{Values, not strategies}{1.5 min}{2}
 \begin{itemize}
-\pt Lemma: any strategy pair's value is within twice its exploitability of the true game value.
-\ck Proof: the best reply is at least the value, and the opponent's best reply is at most it. Each gap is at most twice exploitability.
-\ck Equilibrium strategies need not be unique, so DCFR and the LP can give different strategies. Values must agree.
-\pt Mid-size turn: difference $7\times10^{-9}$ against exploitability $5\times10^{-6}$.
+\pt Lemma: any pair of strategies earns within twice its exploitability of the true game value. So every equilibrium has the same value.
+\ck \why the value is at most what my best reply earns (current winnings plus my gain), and at least what his best reply leaves me (current minus his gain). Each gain is at most twice the exploitability.
+\ck Equilibrium strategies need not be unique. When a hand is indifferent, many mixes are equally good. So the LP and DCFR can legitimately give different strategies, but their values must agree.
+\pt Mid-size turn: values differ by 7 billionths, well inside twice the exploitability of 5 millionths.
 \end{itemize}
 
 %======================================================================
 \slide{24}{Demonstration}{5 min}{}
 \begin{itemize}
-\pt \cue{Browser.} Postflop, K72, one size.
-\pt Point at memory estimate. \textbf{Build and solve}. Point at workers and the 0.3\% line.
-\pt \cue{Stop at about 60 s.}
-\pt Click \textbf{check}, then \textbf{5\SP}. Show grid.
-\pt Skip locking: ``Next slide has it.''
-\pt Preflop push/fold 10\,bb: shove 58\%, call 37\%.
+\pt \cue{Switch to the browser.} Postflop page, K72 example, one size per street.
+\pt Point at the memory estimate (slide 15). Press \textbf{Build and solve}. Point at the worker count (slide 18) and the curve with its 0.3\% line (slide 19).
+\pt \cue{Stop at about 60 seconds.} If asked why it's slow: plain JavaScript; commercial solvers are compiled and use suit symmetry.
+\pt Click \textbf{check}, then \textbf{5\SP}. Each turn card has its own solution. The grid is a summary; the solver works on individual hands, which is where card removal shows up.
+\pt Skip locking: ``The next slide shows locking with numbers.''
+\pt Preflop push or fold at 10\,bb: shove 58\%, call 37\%. Matches the LP to 5 digits.
+\pt \cue{If it breaks: go back to slides and describe from the screenshot.}
 \end{itemize}
 
 %======================================================================
 \slide{25}{Node locking}{1 min}{1}
 \begin{itemize}
-\pt A locked node keeps a fixed strategy: no regret updates, best replies can't change it. DCFR solves the restricted game.
-\ck River example: after a check, lock the button to bet a third of the pot with every hand. Equilibrium never makes that bet.
-\pt Against the lock: big blind folds 49\% $\to$ 29\%. Value $-16.2$ $\to$ $-6.2$ chips. 40 $\to$ 27 iterations.
+\pt A locked node keeps a fixed strategy: its regrets aren't updated and best replies can't change it. DCFR then solves the restricted game, where everyone else adapts to the lock. Nothing else in the code changes.
+\pt \why players use it: to exploit a known opponent habit.
+\ck Example on the river: after a check, the button is locked to bet a third of the pot with every hand. In equilibrium he never makes that bet, so the big blind's response was undetermined.
+\pt Against the lock the big blind folds 29\% instead of 49\%, because an all-hands bet is weak and easy to call. His value goes from minus 16.2 to minus 6.2 chips, and it converges in 27 iterations instead of 40.
 \end{itemize}
 
 %======================================================================
 \slide{26}{Aggregate flop reports}{1 min}{1}
 \begin{itemize}
-\pt Permuting suits: 22,100 flops collapse to 1,755 different ones, in groups of 4, 12 or 24.
-\ck A report solves a subset and weights by group size. Stratified by texture and rank: a stratified quadrature.
-\pt Each flop solved to 0.05\% of the pot.
-\pt Table: 25, 49, 95 flops all give a big blind value near $-0.45$ chips and betting about 20\%.
+\pt Swapping suits doesn't change the strategy, so 22,100 flops reduce to 1,755 different ones. Each stands for 4, 12 or 24 real flops (monotone 4, rainbow 24).
+\ck A report solves the same spot on a subset of flops, weighting each by how many real flops it stands for.
+\pt Subsets are chosen evenly across textures and ranks, so the average is a stratified quadrature over all flops. Standard errors come from pairing neighboring strata.
+\pt Each flop is solved to 0.05\% of the pot, so each value is off by at most 0.1\%.
+\pt Table: 25, 49 and 95 flops all give a big blind value of about minus 0.45 chips and bet about 20\%. They agree within error, so 25 flops is already enough.
 \end{itemize}
 
 %======================================================================
 \slide{27}{Preflop: card removal}{1 min}{1}
 \begin{itemize}
-\pt Preflop works per class: 169 of them. After the flop, hands are settled by all-in equity.
-\pt Card removal between classes: exact fraction of compatible pairs. Only classes sharing a rank differ from 1.
-\pt Exact for two players.
-\ck Table: DCFR matches the LP. At 10\,bb: push 58\%, call 37\%.
+\pt There are 169 hand classes (13 pairs, 78 suited, 78 offsuit), with one strategy per class.
+\pt After the flop nothing is modeled: hands are paid by all-in equity. That's exact for push or fold, and an approximation otherwise.
+\pt Card removal between two classes is the exact fraction of compatible combinations. Only classes that share a rank are affected (27\% of pairs). \why it's exact heads-up: only two hands interact.
+\ck Table: DCFR equals the LP to 5 digits from 5 to 20\,bb. At 10\,bb the small blind shoves 58\% and the big blind calls 37\%. Deeper stacks play tighter.
 \end{itemize}
 
 %======================================================================
 \slide{28}{Payoff errors and exploitability}{1 min}{2}
 \begin{itemize}
-\pt Lemma: if every payoff is off by at most $\delta$, an $\varepsilon$-equilibrium becomes at worst $(\varepsilon+\delta)$.
-\ck Proof: expected payoffs are averages, so they move at most $\delta$; so do both best replies.
-\ck Equity tables are Monte Carlo. Two independent tables give $\delta$.
-\pt Measured error is 4--5 orders of magnitude below the bound.
+\pt Lemma: if every payoff is wrong by at most some amount, every expected payoff is too. A near-equilibrium of the wrong game is a near-equilibrium of the true game, with error at most that amount larger.
+\ck \why an expected payoff is an average of payoffs, and an average of things each off by at most that amount is also off by at most that amount. Best replies are maximums of averages, so the same holds.
+\ck The equity tables are Monte Carlo estimates. Two independently generated tables differ by at most 0.012, which gives the bound.
+\pt The measured error is 10,000 to 100,000 times below the bound. \why the bound is worst case, while the real errors are random and average out.
 \end{itemize}
 
 %======================================================================
 \slide{29}{Three-way showdowns: low rank}{0.5 min}{1}
 \begin{itemize}
-\pt A three-way showdown costs $169^2$ per class.
-\pt Truncated eigendecomposition with $R$ terms: cost $2\cdot169\cdot R$.
-\ck The slices are not low rank, but against nonnegative ranges the product is.
-\pt Rank 16: error $2.7\times10^{-3}$, about 5 times cheaper.
+\pt A three-way all-in needs, for each class, a double sum over both opponents' classes: 169 times 169 steps per class.
+\pt Each class's equity table is symmetric (swapping the opponents changes nothing), so it has an eigendecomposition. Keeping the top 16 terms turns each into two dot products: about 5 times cheaper.
+\ck The tables themselves are not close to low rank (6\% error at rank 16). But multiplied by nonnegative ranges the error is only 0.27\%. \why intuition: ranges average over many entries, so the dropped terms largely cancel.
 \end{itemize}
 
 %======================================================================
 \slide{30}{Multiway convergence}{0.5 min}{1}
 \begin{itemize}
-\pt Three or more players: not zero-sum between two sides, so no guarantee.
-\pt We measure NashConv: the total each player could gain by deviating.
-\ck Push or fold: about $10^{-6}$\,bb. Six players at 20\,bb stalls near 0.06\,bb. 100\,bb is still going down.
+\pt With three or more players the game isn't a two-sided zero-sum game, so CFR has no guarantee of finding an equilibrium.
+\pt We measure NashConv: the total each player could gain by deviating. It's zero at an equilibrium.
+\ck Push or fold reaches about one millionth of a big blind. Six players at 20\,bb stalls near 0.06\,bb per hand. At 100\,bb it's still dropping (0.04 after 843 iterations).
+\pt Pluribus also used CFR for six players without a guarantee, and it worked in practice.
 \end{itemize}
 
 %======================================================================
 \slide{31}{Limitations}{0.5 min}{5}
 \begin{itemize}
-\pt Flop: seconds per iteration in a browser. Commercial solvers are native code.
-\ck Proven rate has a vacuous constant. Counts are for one pair of ranges and two menus.
-\ck Preflop treats postflop as all-in.
-\ck Multiway: no guarantee.
-\ck Parallel measured on two cores only.
-\ck Flop not yet compared with an established solver. Exact checks up to 40 hands.
+\pt Speed: seconds per flop iteration in browser JavaScript. Commercial solvers are compiled, use vector instructions and exploit suit symmetry.
+\ck Theory: the proven rate has a useless constant, and the fast rates we observe are unexplained. Counts cover one pair of ranges and two betting menus.
+\ck Preflop treats everything after the flop as all-in, so it overvalues hands that play poorly after the flop.
+\ck Multiway: no guarantee, and card removal between opponents is approximated as independent.
+\ck Parallel tested on two cores only.
+\ck Flop not yet compared with an established solver. Exact checks only up to 40 hands.
 \end{itemize}
 
 %======================================================================
 \slide{32}{Next steps}{0.5 min}{6}
 \begin{itemize}
-\pt Compare with an open-source solver on the same flop trees.
-\ck Newton finish to high precision.
-\ck Suit isomorphism: up to 4$\times$ on monotone flops.
-\ck WebAssembly with SIMD; GPU leaves.
-\ck Regret-based pruning.
-\ck Preflop with realization.
-\ck Theory of the observed DCFR rates.
+\pt First: compare with an open-source solver on the same flop trees. \why it's the missing full-size validation.
+\ck High-precision finish: restrict to the actions DCFR uses and solve the equilibrium equations with a Newton method. Earlier work reached 13 digits on river spots.
+\ck Suit symmetry: interchangeable suits give identical subtrees, so solve one and copy. Up to 4 times faster on monotone flops.
+\ck Compiled WebAssembly with vector instructions; graphics cards for the leaf sweeps.
+\ck Pruning: skip subtrees whose regrets stay negative, with a correction that keeps results exact.
+\ck Preflop using values from postflop solves instead of all-in equity.
+\ck Open problem: a theory for why DCFR is so fast on poker.
 \end{itemize}
 
 %======================================================================
 \slide{33}{Conclusions}{0.5 min}{3}
 \begin{itemize}
-\pt One method, discounted CFR, solves postflop, locked and preflop games.
-\ck Vectors over hands; every leaf linear time.
-\ck Cost model explains time; single precision is enough; parallel matches sequential.
-\ck Medians 16, 47, 97 iterations on river, turn, flop; under 200 on every board. Time per iteration decides the running time.
+\pt One method, discounted CFR, handles postflop, locked and preflop games.
+\ck Storing everything as lists over hands turns each iteration into simple loops, and every leaf costs time linear in the number of hands.
+\ck A two-term cost model predicts the time per iteration, single precision is enough, and the parallel version reproduces the sequential one.
+\ck Median iterations: 16 on the river, 47 on the turn, 97 on the flop, and under 200 on every sampled board. Iteration counts barely grow with the tree, so the cost per iteration decides the running time.
 \end{itemize}
 
 %======================================================================
 \slide{34}{References}{}{}
 \begin{itemize}
 \pt Thank you. Questions?
+\pt Key sources if asked: Hart and Mas-Colell (regret matching), Zinkevich and others (CFR), Tammelin (CFR-plus), Brown and Sandholm (DCFR, Pluribus), Koller, Megiddo and von Stengel (the LP).
 \pt Site, source and experiments: github.com/ dwangnumbers/ Poker-Solver
 \end{itemize}
 
