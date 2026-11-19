@@ -227,8 +227,8 @@
 \pt The solver is deterministic, so the only randomness is the board: counts are independent draws from one unknown distribution.
 \ck Lemma: each count falls below the true median with probability one half, like a coin flip. So the number below is binomial, which gives the exact coverage of the interval from sixth smallest to sixth largest.
 \ck Proof: the interval misses only if too few counts fall below the median, or too few above: coin-flip tails.
-\ck 20 flops: 96\% coverage. All 20 land below the 86th percentile only 5\% of the time, so with 95\% confidence 86\% of flops need at most the worst seen. Sign test: 40 wins out of 40 has odds of about one in 550 billion for a fair coin.
-\pt \why distribution-free: counts are skewed whole numbers; no normality needed. Ties only make it conservative. Covers only these ranges and menus.
+\ck 20 flops: 96\% coverage. All 20 land below the 86th percentile only 5\% of the time, so with 95\% confidence 86\% of flops need at most the worst seen. Sign test: 40 of 40 is one in 550 billion.
+\pt \why distribution-free: counts are skewed whole numbers; no normality needed. Covers only these ranges and menus.
 \end{itemize}
 
 %======================================================================
