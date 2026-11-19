@@ -447,38 +447,6 @@ At 1081 hands the sweep is several hundred times faster than the direct sum and 
 \end{frame}
 
 % =====================================================================================
-\begin{frame}{Proof of the leaf formulas}
-\begin{block}{Lemma (inclusion--exclusion)}
-For my hand $h=\{h_1,h_2\}$ and an opponent hand $j$:
-\quad $\mathbf 1[\,j \text{ avoids } h\,] = 1 - \mathbf 1[h_1\in j] - \mathbf 1[h_2\in j] + \mathbf 1[j=h]$.
-\end{block}
-\pause
-\textbf{Proof.} No shared card: $1$. One shared card: $0$. Both shared means $j=h$: $1-1-1+1=0$.\hfill$\square$\\
-Weighting by $r_j$ and summing over $j$ gives the fold formula.
-
-\pause
-\textbf{Showdown.} The coefficient of one compatible opponent hand $j$ in the showdown formula:
-\begin{center}\vspace{-4pt}\small\setlength\tabcolsep{8pt}
-\begin{tabular}{lll}
-\toprule
-$j$ is & counted in & coefficient \\ \midrule
-weaker & $m$, $L$, $L^=$ & $\ell+(w-\ell)=w$ \\
-tied & $m$, $L^=$ & $\ell+(\theta-\ell)=\theta$ \\
-stronger & $m$ & $\ell$ \\ \bottomrule
-\end{tabular}
-\end{center}
-These are the payoffs. My own hand has my strength, so its correction enters $L^=$ only.\hfill$\square$
-\note{
-Worked example with card removal. I hold A$\spadesuit$K$\spadesuit$ with strength 3; $w=5$, $\ell=-5$, $\theta=0$. The opponent holds
-7$\clubsuit$6$\clubsuit$ (strength 1, reach 1), K$\spadesuit$2$\diamondsuit$ (2, 0.5), A$\spadesuit$Q$\clubsuit$ (3, 1), K$\heartsuit$J$\heartsuit$
-(3, 0.5) and Q$\heartsuit$Q$\diamondsuit$ (5, 1). Below strength 3 the running total is 1.5, of which 0.5 contains K$\spadesuit$, so $L=1$.
-Up to strength 3 the total is 3, with 1 containing A$\spadesuit$ and 0.5 containing K$\spadesuit$, so $L^==1.5$. The fold formula gives
-$m=4-1-0.5=2.5$. Then $v=-12.5+10+2.5=0$, which matches win, tie and loss against the three compatible hands.
-}
-\end{frame}
-
-
-% =====================================================================================
 \begin{frame}{A cost model for one iteration}
 The time of one iteration is modelled by two work counts,
 \[ T \approx a\,W_{\mathrm{dec}} + b\,W_{\mathrm{show}}, \qquad W_{\mathrm{dec}}=\sum_{\text{decisions}} n_p|A|, \]
