@@ -58,6 +58,14 @@
 \newcommand{\src}[1]{{\par\vfill\hfill\tiny\color{ink2}#1}}
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\ex}{\operatorname{expl}}
+\newcommand{\BR}{\operatorname{BR}}
+\makeatletter
+\newcommand{\tightdisplays}{\setlength\abovedisplayskip{5pt}\setlength\belowdisplayskip{5pt}%
+  \setlength\abovedisplayshortskip{2pt}\setlength\belowdisplayshortskip{3pt}}
+\g@addto@macro\normalsize{\tightdisplays}\g@addto@macro\small{\tightdisplays}\g@addto@macro\footnotesize{\tightdisplays}
+\makeatother
+\newcommand{\pos}[1]{{{#1}^{+}}}
+\newcommand{\lbl}[1]{\text{\color{ink2}\small #1}}
 
 % ---------- playing cards (four-colour deck) ----------
 \colorlet{suit-s}{ink}\colorlet{suit-h}{suitred}\colorlet{suit-d}{suitblue}\colorlet{suit-c}{suitgreen}
@@ -165,17 +173,16 @@ with one bet size per street has tens of thousands, because every turn and river
 
 % =====================================================================================
 \begin{frame}{Zero-sum games, equilibrium and exploitability}
-Behavioural strategies of the two players determine realization plans $x\in X$ and $y\in Y$, polytopes defined by
-flow constraints, and the expected payoff is bilinear.
+Strategies are probability vectors $x$ and $y$, and player 1's expected payoff is \ $u(x,y) = x^\top A y$.
 \pause
 \begin{block}{Minimax theorem (von Neumann 1928)}
-\[ \max_{x\in X}\min_{y\in Y} x^\top A y \;=\; \min_{y\in Y}\max_{x\in X} x^\top A y \;=:\; v^\ast . \]
+\[ \max_{x}\ \min_{y}\ u(x,y) \;=\; \min_{y}\ \max_{x}\ u(x,y) \;=\; v^\ast, \quad\text{the value of the game.} \]
 \end{block}
 \pause
-A pair attaining both sides is a Nash equilibrium. Solution quality is measured by the \textbf{exploitability}
-\[\ex(x,y) \;=\; \tfrac12\Big(\max_{x'} x'^\top A y \;-\; \min_{y'} x^\top A y'\Big)\;\ge 0 ,\]
-reported as a percentage of the pot. \pause With rake the game is not zero-sum and the convergence theorems below do not
-apply. The solver then reports the mean gain of the two best responses.
+A pair attaining both sides is a Nash equilibrium. Quality is measured by the \textbf{exploitability}, the average gain of
+the two best replies:
+\[ \ex(x,y) \;=\; \tfrac12\Big(\underbrace{\max_{x'} u(x',y)}_{\BR_1(y)} \;-\; \underbrace{\min_{y'} u(x,y')}_{\BR_2(x)}\Big) \;\ge\; 0 . \]
+It is reported as a percentage of the pot. \pause With rake the game is not zero-sum, and the theorems below do not apply.
 \note{
 This is a convex-concave saddle-point problem with bilinear coupling, and the exploitability is the primal-dual gap. Commercial
 solvers stop between 0.1\% and 0.5\% of the pot.\\[3pt]
@@ -188,14 +195,15 @@ With rake, DCFR is used as a heuristic; the measured exploitability is still rep
 
 % =====================================================================================
 \begin{frame}{Regret matching and counterfactual regret minimization}
-At every information set $I$, CFR keeps a cumulative regret per action and plays in proportion to its positive part:
-\[ R_T(I,a) = \sum_{t=1}^T \big(v_t(I,a) - v_t(I)\big), \qquad \sigma_{T+1}(I,a) = \Pr\nolimits_{T+1}(a\mid I) = \frac{[R_T(I,a)]^+}{\sum_b [R_T(I,b)]^+}, \]
-the probability of action $a$ at $I$ in iteration $T+1$.
-\pause The values $v_t$ are \textbf{counterfactual}: they are weighted by the probability that chance and the opponent reach $I$.
+At every information set $I$, CFR keeps a running regret for each action $a$, how much better $a$ would have done:
+\[ R_T(I,a) \;=\; \sum_{t=1}^{T} \big(\, v_t(I,a) - v_t(I) \,\big), \]
+and plays each action in proportion to its positive part $\pos R=\max(R,0)$:
+\[ \Pr\nolimits_{T+1}(a\mid I) \;=\; \pos{R_T(I,a)}\ \Big/ \ \textstyle\sum_b \pos{R_T(I,b)} . \]
+\pause The values $v_t$ are \textbf{counterfactual}: weighted by the chance and opponent reach of $I$.
 \pause
 \begin{block}{Theorem (Zinkevich, Johanson, Bowling and Piccione 2007)}
-The overall regret is bounded by the sum of the counterfactual regrets, so the average strategies satisfy
-\[ \ex(\bar x_T,\bar y_T) \ \le\ \frac{\Delta\,|\mathcal I|\sqrt{|A|}}{\sqrt T}. \]
+The average strategies satisfy \quad $\ex(\bar x_T,\bar y_T) \ \le\ \Delta\,|\mathcal I|\,\sqrt{|A|}\,\big/\sqrt T$,\\[2pt]
+{\footnotesize where $\Delta$ is the largest regret change and $|\mathcal I|$ the number of information sets.}
 \end{block}
 \pause
 The bound guarantees convergence; at practical $T$ it is vacuous.
@@ -216,17 +224,18 @@ $10^{7}$ chips. The observed behaviour is far better and is measured later.
 % =====================================================================================
 \begin{frame}{Regret matching: proof of the $\sqrt T$ bound}
 \begin{block}{Theorem (Hart and Mas-Colell 2000)}
-If every instantaneous regret satisfies $|r_t(a)|\le\Delta$, regret matching gives $\max_a R_T(a)\le\Delta\sqrt{|A|\,T}$.
+If every regret change satisfies $|r_t(a)|\le\Delta$, then after $T$ rounds \quad $\max_a R_T(a)\ \le\ \Delta\sqrt{|A|\,T}$.
 \end{block}
-\small
 \pause
-\textbf{Proof.} Let $\Phi_t=\sum_a\big([R_t(a)]^+\big)^2$, the squared length of the positive regret vector.
-\begin{enumerate}[<+->]\setlength\itemsep{1pt}
-\item Since $r_t(a)=u_t(a)-u_t(\sigma_t)$ and $\sigma_t(a)=\Pr\nolimits_t(a)$ is a probability vector, $\sum_a\sigma_t(a)\,r_t(a)=0$. As $\sigma_t$ is
-proportional to $[R_{t-1}]^+$, also $\sum_a[R_{t-1}(a)]^+\,r_t(a)=0$.
-\item For all real $x$ and $r$, $\big([x+r]^+\big)^2\le\big([x]^++r\big)^2$, by the cases $x+r\le0$, $x\ge0$ and $x<0<x+r$.
-\item Hence $\Phi_t\le\Phi_{t-1}+2\sum_a[R_{t-1}(a)]^+r_t(a)+\sum_ar_t(a)^2\le\Phi_{t-1}+|A|\Delta^2$, and $\Phi_T\le|A|\Delta^2T$.
-\item Finally $\max_aR_T(a)\le\sqrt{\Phi_T}\le\Delta\sqrt{|A|T}$.\hfill$\square$
+\textbf{Proof.} Track the squared length of the positive regrets, \quad $\Phi_t=\sum_a \big(\pos{R_t(a)}\big)^2$.
+\small
+\begin{enumerate}[<+->]\setlength\itemsep{3pt}
+\item \textbf{Balance.} Regret is measured against what was played, and play is proportional to $\pos{R_{t-1}}$, so
+\[ \textstyle\sum_a \Pr\nolimits_t(a)\, r_t(a)=0 \qquad\text{and}\qquad \sum_a \pos{R_{t-1}(a)}\, r_t(a)=0 . \]
+\item \textbf{Square inequality.} For all real $x$ and $r$: \ $\big(\pos{(x+r)}\big)^2 \le (\pos x+r)^2$ \ (check $x+r\le0$, $x\ge0$, $x<0<x+r$).
+\item \textbf{Growth.} Expanding the square, the cross term vanishes by step 1:
+\ $\Phi_t \le \Phi_{t-1} + \sum_a r_t(a)^2 \le \Phi_{t-1} + |A|\Delta^2$.
+\item \textbf{Conclusion.} $\Phi_T\le|A|\Delta^2T$, \ so \ $\max_a R_T(a) \le \sqrt{\Phi_T} \le \Delta\sqrt{|A|T}$.\hfill$\square$
 \end{enumerate}
 \note{
 Step 1 is the geometric heart: the new regret vector is orthogonal to the current positive regret vector, so the positive part grows
@@ -242,23 +251,19 @@ with $\Delta=2$, $|A|=3$, $T=4$ is $2\sqrt{12}\approx6.9$.
 
 \begin{frame}{From small regret to an approximate equilibrium}
 \begin{block}{Lemma}
-If the average regrets of the two players after $T$ rounds are at most $\varepsilon_1$ and $\varepsilon_2$, the averages
-$\bar x_T,\bar y_T$ satisfy $\ex(\bar x_T,\bar y_T)\le\tfrac12(\varepsilon_1+\varepsilon_2)$.
+If the two players' average regrets after $T$ rounds are at most $\varepsilon_1$ and $\varepsilon_2$, their average strategies
+$\bar x,\bar y$ satisfy \quad $\ex(\bar x,\bar y)\ \le\ \tfrac12(\varepsilon_1+\varepsilon_2)$.
 \end{block}
-\small
 \pause
-\textbf{Proof.} The payoff is linear in each argument, so $\frac1T\sum_t x'^\top Ay_t=x'^\top A\bar y_T$ for every $x'$, and likewise for
-$y'$. With $\bar U=\frac1T\sum_tx_t^\top Ay_t$ the regret bounds read
-\[ \max_{x'}x'^\top A\bar y_T-\bar U\le\varepsilon_1,\qquad \bar U-\min_{y'}\bar x_T^\top Ay'\le\varepsilon_2 . \]
-Adding the two and halving gives the claim.\hfill$\square$
+\textbf{Proof.} The payoff is linear, so playing against the opponent's sequence of strategies is the same as playing against
+his average. With $\bar U$ the average payoff actually received, the regret bounds become
+\[ \BR_1(\bar y)-\bar U\ \le\ \varepsilon_1, \qquad\qquad \bar U-\BR_2(\bar x)\ \le\ \varepsilon_2 . \]
+Add the two and halve.\hfill$\square$
 
 \pause
-\medskip
-\textbf{CFR.} For perfect recall the overall regret of a player splits over information sets,
-\[ \textstyle\sum_t\big(u(\sigma')-u(\sigma_t)\big)=\sum_I\pi^{\sigma'}(I)\sum_a\sigma'(I,a)\,R_T(I,a)\;\le\;\sum_I\max_a[R_T(I,a)]^+ , \]
-where $\sigma'(I,a)=\Pr\nolimits_{\sigma'}(a\mid I)$ and $\pi^{\sigma'}(I)$ is the probability that the player's own actions under $\sigma'$
-reach $I$. Each term is at most $\Delta\sqrt{|A|T}$ by the previous slide. This proves the CFR theorem. Letting $T\to\infty$ also proves
-the minimax theorem.
+\textbf{CFR.} In a tree a player's total regret splits over her information sets:
+\[ \text{total regret}\ \le\ \textstyle\sum_I \max_a \pos{R_T(I,a)}\ \le\ |\mathcal I|\,\Delta\sqrt{|A|T} . \]
+This proves the CFR theorem; letting $T\to\infty$ also proves the minimax theorem.
 \note{
 The decomposition identity is a telescoping sum over the information sets of the player, using that her own reach is the same at every
 history of an information set (perfect recall). The study guide writes out the telescoping and checks it on a two-decision example.\\[3pt]
@@ -271,21 +276,29 @@ The lemma is about the averages. The current strategies of regret matching need 
 
 % =====================================================================================
 \begin{frame}{Discounted CFR}
-DCFR discounts the cumulative quantities at iteration $t$ before adding the new ones:
-\[ R \leftarrow \begin{cases} R\,\dfrac{t^\alpha}{t^\alpha+1} & R>0\\[6pt] R\,\dfrac{t^\beta}{t^\beta+1} & R\le 0\end{cases} \;+\; \big(v(a)-v\big),
-   \qquad S \leftarrow S\Big(\frac{t}{t+1}\Big)^{\gamma} + \pi_{\mathrm{own}}(I)\,\sigma_t(I,a) . \]
-Here $\sigma_t(I,a)=\Pr\nolimits_t(a\mid I)$, and $\pi_{\mathrm{own}}(I)$ is the player's own probability of reaching $I$.
-\pause We use $(\alpha,\beta,\gamma) = (1.5,0,2)$ and update the players alternately. CFR is the limit $\alpha=\beta=\infty$,
-$\gamma=0$, and CFR$^+$ is $\alpha=\infty$, $\beta=-\infty$, $\gamma=1$.
+Before adding iteration $t$, DCFR shrinks what it has accumulated:
+\begin{center}\small
+\begin{tabular}{lll}
+\toprule
+quantity & multiply by & then add \\ \midrule
+positive regret & $t^{1.5}/(t^{1.5}+1)$ & $v(a)-v$ \\
+negative regret & $1/2$ & $v(a)-v$ \\
+strategy sum & $\big(t/(t+1)\big)^2$ & $\text{reach}(I)\times\Pr\nolimits_t(a\mid I)$ \\ \bottomrule
+\end{tabular}
+\end{center}
+\pause
+\small These are the parameters $(\alpha,\beta,\gamma)=(1.5,0,2)$. CFR shrinks nothing; CFR$^+$ zeroes negative regrets and weights
+iteration $t$ by $t$. Players are updated alternately.
 \pause
 \begin{block}{Theorem (Brown and Sandholm 2019)}
-With $(\alpha,\beta,\gamma)=(1.5,0,2)$ and simultaneous updates, the weighted average strategies form a
-$6\Delta|\mathcal I|\big(\sqrt{|A|}+1/\sqrt T\big)/\sqrt T$ equilibrium after $T$ iterations.
+With simultaneous updates, the weighted averages after $T$ iterations are an $\varepsilon$-equilibrium with $\varepsilon$ of order
+$\Delta\,|\mathcal I|\sqrt{|A|}\,/\sqrt T$: the same rate as CFR.
 \end{block}
 \pause
-\vspace{-4pt}The implementation computes exactly these iterates: subtrees the opponent cannot reach are still visited to apply the
-discounts, and only their leaves are skipped.
+Unreachable subtrees are still visited, so the iterates are exact.
 \note{
+The exact bound of the theorem is $\varepsilon=6\Delta|\mathcal I|\big(\sqrt{|A|}+1/\sqrt T\big)/\sqrt T$.\\[3pt]
+
 The theorem is proved for simultaneous updates. The solver alternates the players, which is standard practice; regret bounds for
 alternating updates are discussed by Burch, Morav\v{c}\'{\i}k and Schmid (2019).\\[3pt]
 Discounting is a forgetting factor. Positive regrets lose a fraction $1/(t^{1.5}+1)$, negative regrets are halved, and the average
@@ -300,20 +313,18 @@ decision work of the skipped subtrees; their leaves are still skipped.
 % =====================================================================================
 \begin{frame}{Discounted CFR: what the discounts do}
 \begin{block}{Lemma}
-The strategy added at iteration $k$ enters $S$ after iteration $T$ with weight $\big(\tfrac{k+1}{T+1}\big)^\gamma$. With $\gamma=2$ and
-contributions of size one, $S_T=\tfrac T3+1+O(1/T)$.
+After $T$ iterations, iteration $k$ has weight $\big(\tfrac{k+1}{T+1}\big)^{2}$ in the average. For terms of size one the strategy
+sum grows like $T/3$.
 \end{block}
-\small
 \pause
-\textbf{Proof.} The contribution is multiplied by $\big(\tfrac t{t+1}\big)^\gamma$ at each later iteration $t=k+1,\dots,T$, and
-$\tfrac{k+1}{k+2}\cdot\tfrac{k+2}{k+3}\cdots\tfrac{T}{T+1}=\tfrac{k+1}{T+1}$. For the sum, $\sum_{j=2}^{T+1}j^2=\tfrac{(T+1)(T+2)(2T+3)}6-1$;
-divide by $(T+1)^2$.\hfill$\square$
+\textbf{Proof.} Iteration $k$'s term is multiplied by $\big(\tfrac{t}{t+1}\big)^2$ at each later iteration, and the product telescopes:
+\[ \frac{k+1}{k+2}\cdot\frac{k+2}{k+3}\cdots\frac{T}{T+1}=\frac{k+1}{T+1} . \]
+For the sum, use $1^2+2^2+\dots+N^2=\tfrac{N(N+1)(2N+1)}6$ and divide by $(T+1)^2$.\hfill$\square$
 
 \pause
-\medskip
-\textbf{Regrets.} A positive regret is multiplied by $1-\tfrac1{t^{1.5}+1}\ge1-t^{-1.5}$, so from iteration $k$ on it keeps at least
-\[ \textstyle\prod_{t>k}\big(1-t^{-1.5}\big)\;\ge\;1-\sum_{t>k}t^{-1.5}\;\ge\;1-\tfrac{2}{\sqrt k}. \]
-A negative regret is halved at every iteration. The method keeps good actions and forgets bad ones within a few iterations.
+\textbf{Regrets.} From iteration $k$ on, a positive regret keeps at least the fraction
+\[ \textstyle\prod_{t>k}\big(1-t^{-1.5}\big)\ \ge\ 1-\sum_{t>k}t^{-1.5}\ \ge\ 1-2/\sqrt k , \]
+while a negative regret is halved every iteration. Good actions are remembered, bad ones forgotten.
 \note{
 Example of the weights: for $T=4$ they are $0.16$, $0.36$, $0.64$ and $1$, so the last iteration has 46\% of the average and the first 7\%.
 For $T=100$ the first iteration has about $0.001\%$.\\[3pt]
@@ -329,26 +340,30 @@ Brown--Sandholm theorem. The growth $S_T\approx T/3$ is used on the precision sl
 \begin{frame}{Range-vectorized traversal of the public tree}
 \begin{columns}[T]
 \column{0.55\textwidth}
-The \textbf{public tree} has one node per betting sequence and dealt card. At a public node the information sets of
-the acting player are indexed by its hands, so every quantity is a vector of length $n_p$.
+The \textbf{public tree} has one node per betting sequence and dealt card. At a public node, the acting player has one
+information set per hand, so every quantity is a vector over hands.
 
 \pause
 \medskip
-A traversal for player $p$ carries the opponent's reach $r_{-p}\in\R^{n_{-p}}$ down and returns the values
-$v_p\in\R^{n_p}$ up. A decision node with $|A|$ actions costs $O(n|A|)$ arithmetic on contiguous memory.
+A traversal for player $p$ carries one vector down and one up:
+\begin{itemize}\setlength\itemsep{1pt}
+\item $q$: the opponent's reach, one entry per opponent hand;
+\item $v$: player $p$'s values, one entry per own hand.
+\end{itemize}
+A decision with $|A|$ actions costs $O(n|A|)$ operations.
 
 \pause
 \medskip
-Regrets and strategy sums are stored action-major, so the inner loops run over hands.
+Regrets and strategy sums are stored action by action, so the inner loops run over hands.
 \column{0.43\textwidth}
 \pause
 \begin{block}{One traversal for player $p$}
 \small
-At an opponent node, recurse on each action $a$ with reach $r_{-p}\odot\sigma(a)$, where $\sigma(a)_h=\Pr(a\mid h)$, and add the
-child values.\\[3pt]
-\pause At an own node, recurse on every action, set $v = \sum_a \sigma(a)\odot v_a$ and update $R$ and $S$.\\[3pt]
-\pause At a chance node, average the children over the dealt cards.\\[3pt]
-\pause At a leaf, return the payoff against $r_{-p}$.
+\textbf{Opponent node:} send $q\odot\Pr(a\mid\text{hand})$ to each child $a$ and add the child values.\\[3pt]
+\pause \textbf{Own node:} combine $v=\sum_a\Pr(a\mid\text{hand})\odot v_a$ and update the regrets and strategy sums.\\[3pt]
+\pause \textbf{Chance node:} average the children over the dealt cards.\\[3pt]
+\pause \textbf{Leaf:} return the payoff against $q$.\\[2pt]
+{\footnotesize $\odot$ multiplies entry by entry.}
 \end{block}
 \end{columns}
 \note{
@@ -362,20 +377,18 @@ allocates no memory.
 
 % =====================================================================================
 \begin{frame}{Chance nodes}
-Once both hands are fixed, $K = 48-|\mathrm{board}|$ cards remain, and each of them is equally likely.
+Once both hands are known, $K = 48-|\text{board}|$ cards remain, and each is equally likely to come next.
 \begin{block}{Lemma}
-For hands $h_1, h_2$ and a card $c$ not in $h_1\cup h_2\cup\mathrm{board}$,
-$\;\Pr(c \mid h_1,h_2,\mathrm{board}) = 1/K$.
+For any card $c$ not on the board and not in either hand, \quad $\Pr(\text{next card}=c\mid\text{both hands, board}) = 1/K$.
 \end{block}
 \pause
-Hence the chance node returns
-\[ v_p(h) \;=\; \frac1K \sum_{c\,\notin\,\mathrm{board}} \mathbf 1[c\notin h]\; v_p^{(c)}(h), \]
-where the child for card $c$ is evaluated with the opponent's hands containing $c$ set to zero reach.
+So the chance node is a plain average of its children:
+\[ v(h) \;=\; \frac1K \sum_{\substack{\text{cards } c \text{ not on the}\\ \text{board and not in } h}} v_c(h), \]
+where the child for card $c$ first removes the opponent hands that contain $c$.
 
 \pause
-\small\textbf{Proof.} Given the $|\mathrm{board}|+4$ seen cards, the shuffle makes every unseen card equally likely. Write the value as a
-sum over opponent hands $j$ and cards $c\notin\mathrm{board}\cup h\cup j$ with the constant weight $1/K$, and exchange the two sums:
-for fixed $c$ the inner sum runs over the $j$ not containing $c$.\hfill$\square$
+\small\textbf{Proof.} The shuffle makes every unseen card equally likely. The value is a double sum over opponent hands and next cards
+with the same weight $1/K$; exchanging the two sums gives one child per card, each over the hands that avoid it.\hfill$\square$
 \note{
 The conditional probability of the next card depends only on the four known private cards, which are excluded by the indicator and
 by zeroing the opponent's reach. Using $1/(52-|\mathrm{board}|)$ would bias every value.\\[3pt]
@@ -386,18 +399,20 @@ The lemma is checked against exact linear programs with explicit chance nodes, o
 
 % =====================================================================================
 \begin{frame}{Fold leaves in linear time}
-At a fold leaf the value of hand $h$ is the payoff times the opponent weight that shares no card with $h$:
-\[ m(h) \;=\; \sum_{j\,:\,j\cap h=\emptyset} r_j \;=\; \tau - s_{h_1} - s_{h_2} + r_{\bar h}, \qquad
-\tau=\sum_j r_j,\quad s_c = \sum_{j\,\ni\, c} r_j . \]
-The last term restores the opponent hand $\bar h$ equal to $h$, which was subtracted twice. The 52 card sums cost $O(n)$,
-and so does the evaluation for all $h$; the direct sum costs $O(n^2)$.
+At a fold leaf, hand $h$ wins a fixed payoff times the opponent weight that shares no card with $h$:
+\[ m(h) \;=\; \tau \;-\; s_{h_1} \;-\; s_{h_2} \;+\; r_{\bar h} \]
+\begin{itemize}\setlength\itemsep{0pt}\small
+\item $\tau$ = the opponent's total weight;
+\item $s_c$ = his weight on hands that contain card $c$ (52 numbers, one per card);
+\item $r_{\bar h}$ = his weight on exactly the hand $h$, which was subtracted twice.
+\end{itemize}
+One pass over his hands and one over mine: $O(n)$ instead of $O(n^2)$.
 
 \pause
 \medskip
 In matrix form the compatibility matrix is
-\[ \Gamma = \mathbf 1\mathbf 1^\top - \sum_{c=1}^{52} e_c f_c^\top + P , \]
-where $e_c$ and $f_c$ indicate the hands containing card $c$ and $P$ matches identical hands: rank at most 53 plus a
-partial permutation.
+\[ \Gamma \;=\; \underbrace{\mathbf 1\mathbf 1^\top}_{\text{all pairs}} \;-\; \underbrace{E E^\top}_{\text{pairs sharing a card}} \;+\; \underbrace{P}_{\text{identical hands}} , \]
+with $E$ the $n\times52$ matrix of which hand holds which card.
 \note{
 Inclusion--exclusion over the two cards of $h$. Two different two-card hands share at most one card, except the identical hand, which
 shares both and is subtracted twice. This is the card-removal effect that players talk about, computed exactly in one pass over each
@@ -409,14 +424,14 @@ list (Johanson and coauthors 2011).
 \begin{frame}{Showdown leaves in linear time}
 \begin{columns}[T]
 \column{0.55\textwidth}
-Sort both lists by hand strength once per runout. One ascending sweep gives, for each own hand, the compatible
-opponent weight that is strictly weaker, $L(h)$, and weaker or equal, $L^{=}(h)$, with the same inclusion--exclusion
-inside the sweep. Then
-\[ v(h) = \ell\, m(h) + (w-\ell)\,L(h) + (\theta-\ell)\big(L^{=}(h)-L(h)\big), \]
-where $w$, $\ell$ and $\theta$ are the payoffs for a win, a loss and a tie.
-
-\medskip
-The sort is cached per runout, so each evaluation is $O(n)$.
+Sort both lists by hand strength once per runout. One sweep up the sorted list gives, for each of my hands $h$,
+\begin{itemize}\setlength\itemsep{0pt}
+\item $L(h)$: compatible opponent weight that $h$ beats,
+\item $L^{=}(h)$: compatible weight that $h$ beats or ties,
+\end{itemize}
+using the same inclusion--exclusion. With win, tie and loss payoffs $w$, $\theta$, $\ell$:
+\[ v(h) = \ell\, m(h) + (w-\ell)\,L(h) + (\theta-\ell)\big(L^{=}(h)-L(h)\big). \]
+The sort is cached, so each evaluation is $O(n)$.
 \pause
 \column{0.43\textwidth}
 \centering
@@ -436,21 +451,25 @@ At 1081 hands the sweep is several hundred times faster than the direct sum and 
 % =====================================================================================
 \begin{frame}{Proof of the leaf formulas}
 \begin{block}{Lemma (inclusion--exclusion)}
-For two-card hands $h=\{h_1,h_2\}$ and $j$:\quad $\mathbf 1[j\cap h=\emptyset]=1-\mathbf 1[h_1\in j]-\mathbf 1[h_2\in j]+\mathbf 1[j=h]$.
+For my hand $h=\{h_1,h_2\}$ and an opponent hand $j$:
+\quad $\mathbf 1[\,j \text{ avoids } h\,] = 1 - \mathbf 1[h_1\in j] - \mathbf 1[h_2\in j] + \mathbf 1[j=h]$.
 \end{block}
-\small
 \pause
-\textbf{Proof.} If $j$ shares no card with $h$ the right side is $1$. If it shares one card it is $0$. If it shares both, then $j=h$ and it is
-$1-1-1+1=0$.\hfill$\square$
-
-Multiplying by $r_j$ and summing over $j$ gives the fold formula $m(h)=\tau-s_{h_1}-s_{h_2}+r_{\bar h}$.
+\textbf{Proof.} No shared card: $1$. One shared card: $0$. Both shared means $j=h$: $1-1-1+1=0$.\hfill$\square$\\
+Weighting by $r_j$ and summing over $j$ gives the fold formula.
 
 \pause
-\medskip
-\textbf{Showdown.} In $v(h)=\ell\,m(h)+(w-\ell)L(h)+(\theta-\ell)\big(L^=(h)-L(h)\big)$ the coefficient of a compatible $r_j$ is
-\[ \ell+(w-\ell)=w \text{ if $j$ is weaker},\qquad \ell+(\theta-\ell)=\theta \text{ if it ties},\qquad \ell \text{ if it is stronger}, \]
-which are the payoffs. In the sweep, $L$ and $L^=$ are the same inclusion--exclusion restricted to the weaker and the
-weaker-or-equal hands. The identical hand $\bar h$ has the strength of $h$, so its correction enters $L^=$ only.\hfill$\square$
+\textbf{Showdown.} The coefficient of one compatible opponent hand $j$ in the showdown formula:
+\begin{center}\vspace{-4pt}\small\setlength\tabcolsep{8pt}
+\begin{tabular}{lll}
+\toprule
+$j$ is & counted in & coefficient \\ \midrule
+weaker & $m$, $L$, $L^=$ & $\ell+(w-\ell)=w$ \\
+tied & $m$, $L^=$ & $\ell+(\theta-\ell)=\theta$ \\
+stronger & $m$ & $\ell$ \\ \bottomrule
+\end{tabular}
+\end{center}
+These are the payoffs. My own hand has my strength, so its correction enters $L^=$ only.\hfill$\square$
 \note{
 Worked example with card removal. I hold A$\spadesuit$K$\spadesuit$ with strength 3; $w=5$, $\ell=-5$, $\theta=0$. The opponent holds
 7$\clubsuit$6$\clubsuit$ (strength 1, reach 1), K$\spadesuit$2$\diamondsuit$ (2, 0.5), A$\spadesuit$Q$\clubsuit$ (3, 1), K$\heartsuit$J$\heartsuit$
@@ -556,20 +575,23 @@ Half the memory for the same result.
 % =====================================================================================
 \begin{frame}{Rounding error in the strategy sums}
 \begin{block}{Lemma}
-With the update $S\leftarrow\mathrm{fl}\big(\mathrm{fl}(S\,w_t)+x_t\big)$, $0\le w_t\le1$, $x_t\ge0$ and unit roundoff $u$, the computed
-sum after $T$ updates satisfies $|\hat S_T-S_T|\le2Tu\,S_T+O(u^2)$.
+Update $S\leftarrow w_tS+x_t$ in floating point, with $0\le w_t\le1$, $x_t\ge0$ and unit roundoff $u$. After $T$ updates the computed
+sum $\hat S_T$ satisfies \quad $|\hat S_T-S_T|\ \le\ 2Tu\,S_T$ \quad (up to $O(u^2)$).
 \end{block}
-\small
 \pause
-\textbf{Proof.} Each operation returns the exact result times $1+\delta$ with $|\delta|\le u$. Write $e_t=\hat S_t-S_t$. One update gives
-$e_t=w_te_{t-1}+\eta_t$ with $|\eta_t|\le2u\,S_t+O(u^2)$, using $w_tS_{t-1}\le S_t$. Unrolling,
-$|e_T|\le\sum_t\big(\prod_{k>t}w_k\big)|\eta_t|\le2u\sum_tS_T=2Tu\,S_T$, because $\prod_{k>t}w_k\,S_t\le S_T$.\hfill$\square$
+\textbf{Proof.} Each operation is exact up to a factor $1+\delta$ with $|\delta|\le u$. Let $e_t=\hat S_t-S_t$.
+\small
+\begin{enumerate}\setlength\itemsep{1pt}
+\item One update: \ $e_t = w_t\,e_{t-1} + \eta_t$, \ with new error $|\eta_t|\le 2u\,S_t$.
+\item Unrolling: \ $|e_T| \le \sum_t (w_{t+1}\cdots w_T)\,|\eta_t|$.
+\item Old sums only shrink, $(w_{t+1}\cdots w_T)\,S_t\le S_T$, so each term is at most $2u\,S_T$: \ $|e_T|\le 2Tu\,S_T$.\hfill$\square$
+\end{enumerate}
 
 \pause
-\medskip
-\textbf{Consequence.} The strategy is a ratio of such sums, so its relative error is at most about $4Tu$. In single precision,
-$u=2^{-24}\approx6\times10^{-8}$, this is $5\times10^{-5}$ after 200 iterations: about four correct digits, more than the iteration itself
-delivers. A new term $x_t\le1$ is lost entirely only when $x_t<\tfrac12u\,S_t\approx\tfrac16u\,t$, after about $10^8$ iterations.
+\normalsize
+\textbf{Consequence.} The strategy is a ratio of two such sums, so its relative error is about $4Tu$. In single precision
+\[ 4Tu \;=\; 4\cdot200\cdot6\times10^{-8} \;\approx\; 5\times10^{-5} \quad\text{after 200 iterations,} \]
+about four correct digits. A new term is lost entirely only after about $10^8$ iterations.
 \note{
 The bound is the classical recursive-summation bound with a discount, linear in $T$ and therefore pessimistic; with rounding errors of
 random sign the typical error grows like $\sqrt T\,u$.\\[3pt]
@@ -593,8 +615,8 @@ workers and a coordinator keeps the tree above. One traversal is three steps:
 \item the coordinator divides by $K$ and finishes the traversal.
 \end{enumerate}
 \pause
-With $t_c$ the coordinator's time and $t_1$ the time of one card, the model is
-$T(P) \approx t_c + \lceil K/P\rceil\, t_1$.
+Time with $P$ workers:
+\[ T(P) \;\approx\; \underbrace{t_c}_{\text{coordinator}} \;+\; \Big\lceil \frac{K}{P} \Big\rceil\, \underbrace{t_1}_{\text{one card}} \]
 \column{0.45\textwidth}
 \centering
 {\footnotesize\setlength\tabcolsep{3pt}\input{data/parallel_table.tex}}\\[4pt]
@@ -669,22 +691,25 @@ iterations when the betting is the same:\\[2pt]
 
 % =====================================================================================
 \begin{frame}{Distribution-free statements about the sample}
-DCFR is deterministic, so the iteration count is a function $X=f(S)$ of a random spot $S$, and a sample is $n$ independent draws.
+DCFR is deterministic, so the iteration count $X$ depends only on the randomly drawn board. The sample is $n$ independent
+counts, sorted as $X_{(1)}\le\dots\le X_{(n)}$.
 \pause
 \begin{block}{Lemma}
-For a continuous distribution with median $m$ and $B\sim\mathrm{Bin}(n,\tfrac12)$,\quad
-$P\big(X_{(j)}\le m\le X_{(n+1-j)}\big)=1-2P(B\le j-1)$.
+Let $m$ be the median count and $B$ the number of heads in $n$ fair coin flips. Then
+\[ P\big(\,X_{(j)}\ \le\ m\ \le\ X_{(n+1-j)}\,\big) \;=\; 1-2\,P(B\le j-1). \]
 \end{block}
-\small
 \pause
-\textbf{Proof.} Let $B$ be the number of draws below $m$; each draw is below $m$ with probability $\tfrac12$, independently. The interval
-misses on the left exactly when $B\le j-1$ and on the right exactly when $B\ge n+1-j$, which has the same probability by symmetry.\hfill$\square$
+\textbf{Proof.} Each count falls below $m$ with probability $\tfrac12$, so the number below $m$ is distributed like $B$. The
+interval misses on the left if at most $j-1$ fall below, and on the right in the mirror-image case.\hfill$\square$
 
 \pause
 \medskip
-For $n=20$ and $j=6$ the coverage is $1-2\cdot\tfrac{21700}{2^{20}}\approx0.96$. Similarly $P(X_{(n)}<q_p)=p^n$, so with $p=0.05^{1/n}$ the
-largest count bounds the $p$-quantile with 95\% confidence: $p=0.86$ for 20 flops. The paired comparisons use the sign test: under
-equal speed each untied board favours either method with probability $\tfrac12$.
+\small
+\begin{itemize}\setlength\itemsep{1pt}
+\item 20 flops, $j=6$: \ coverage $1-2\cdot\tfrac{21700}{2^{20}}\approx0.96$.
+\item The largest count is below the $p$-quantile with probability $p^n$; with $p=0.05^{1/20}=0.86$ that is 5\%.
+\item Sign test: if two methods were equally fast, each board would favour either one like a fair coin.
+\end{itemize}
 \note{
 None of these statements assumes a distribution for the counts. Ties between integer counts only make the intervals conservative.\\[3pt]
 The sign test p-value is $2P(B\le\min(w,l))$ with $B\sim\mathrm{Bin}(w+l,\tfrac12)$. For 40 wins and no losses it is $2^{-39}$.\\[3pt]
@@ -720,19 +745,19 @@ established open-source solver on a full flop tree is the natural next test.
 % =====================================================================================
 \begin{frame}{Why values are compared and strategies are not}
 \begin{block}{Lemma}
-For every pair, $|x^\top Ay-v^\ast|\le\max(g_1,g_2)\le2\ex(x,y)$, where $g_1,g_2$ are the two best-response gains. In particular every
-equilibrium has value $v^\ast$.
+For every pair of strategies, \quad $|u(x,y)-v^\ast|\ \le\ 2\,\ex(x,y)$. \quad In particular every equilibrium has value $v^\ast$.
 \end{block}
-\small
 \pause
-\textbf{Proof.} $v^\ast=\min_{y'}\max_{x'}x'^\top Ay'\le\max_{x'}x'^\top Ay=x^\top Ay+g_1$, and
-$v^\ast=\max_{x'}\min_{y'}x'^\top Ay'\ge\min_{y'}x^\top Ay'=x^\top Ay-g_2$.\hfill$\square$
+\textbf{Proof.} With $g_1, g_2$ the two best-reply gains,
+\[ v^\ast \;\le\; \BR_1(y) \;=\; u(x,y)+g_1, \qquad\qquad v^\ast \;\ge\; \BR_2(x) \;=\; u(x,y)-g_2 , \]
+and $\max(g_1,g_2)\le g_1+g_2=2\ex$.\hfill$\square$
 
 \pause
 \medskip
-Equilibrium strategies need not be unique: for $A=\begin{pmatrix}0&1\\0&1\end{pmatrix}$ every $x$ paired with the first column is an
-equilibrium, all with value $0$. So DCFR and the LP may return different strategies, but their values must agree within twice the
-remaining exploitability. On the mid-size turn check the difference is \TurnMidDiff\ against an exploitability of \TurnMidExpl.
+Equilibrium strategies need not be unique: for $A=\bigl(\begin{smallmatrix}0&1\\0&1\end{smallmatrix}\bigr)$ every strategy of
+player 1, paired with the first column, is an equilibrium of value 0. So DCFR and the LP may return different strategies, but
+their values must agree within twice the remaining exploitability. On the mid-size turn check the difference is \TurnMidDiff\
+against an exploitability of \TurnMidExpl.
 \note{
 This lemma is the reason the validation slide compares values. It also bounds the error of every value the solver reports, for example the
 flop-report averages, by twice the exploitability of each solve.
@@ -770,9 +795,9 @@ first-in table.
 
 % =====================================================================================
 \begin{frame}{Node locking}
-A locked node keeps a fixed strategy $\hat\sigma(I,a)=\Pr(a\mid I)$: its regrets are not updated, the traversals use $\hat\sigma$, and
-best responses do not optimize over it. DCFR then solves the \textbf{restricted game}
-\[ \min_{y\in Y}\ \max_{x\in X,\ x|_{\text{locked}} = \hat\sigma}\ x^\top A y . \]
+A locked node keeps a fixed strategy $\Pr(a\mid I)$: its regrets are not updated, and best replies cannot change it. DCFR then
+solves the \textbf{restricted game}
+\[ \min_{y}\ \ \max_{x \text{ agreeing with the lock}}\ \ u(x,y) . \]
 \pause
 Example on the river: after a check the button is locked to bet a third of the pot with every hand. In equilibrium it
 never makes that bet, so the big blind's response to it is off the equilibrium path and not determined by the game.
@@ -849,13 +874,12 @@ The LP has 169 strategy variables and 169 constraints. At 10 bb the frequencies 
 % =====================================================================================
 \begin{frame}{Payoff errors and exploitability}
 \begin{block}{Lemma}
-If the payoffs of a game are perturbed by at most $\delta$ at every terminal node, then every expected payoff changes by
-at most $\delta$, and an $\varepsilon$-equilibrium of the perturbed game is an $(\varepsilon+\delta)$-equilibrium of the
-original game.
+If every payoff of a game is off by at most $\delta$, then every expected payoff is off by at most $\delta$, and an
+$\varepsilon$-equilibrium of the perturbed game is an $(\varepsilon+\delta)$-equilibrium of the original game.
 \end{block}
 \pause
-\small\textbf{Proof.} $|u'-u|\le\sum_z\pi(z)\,|U'(z)-U(z)|\le\delta$. So each best-response value moves by at most $\delta$, and
-$\ex=\tfrac12(\max_{x'}u-\min_{y'}u)\le\ex'+\delta$.\hfill$\square$
+\small\textbf{Proof.} An expected payoff is an average of payoffs, so it moves by at most $\delta$; so do both best-reply values,
+and \ $\ex=\tfrac12(\BR_1-\BR_2)\le\ex'+\delta$.\hfill$\square$
 
 \pause
 \vspace{-2pt}The equity tables are Monte Carlo estimates. Two independent tables differ by at most \SensMax, which gives $\delta$; the measured
@@ -876,10 +900,11 @@ not a worst-case $\delta$.
 
 % =====================================================================================
 \begin{frame}{Three-way showdowns: a low-rank factorization}
-A three-way showdown needs $\sum_{j,k} a_j b_k F_i(j,k)$ for every $i$, where $F_i(j,k)$ is the equity of $i$ against
-$j$ and $k$: $169^3$ operations per leaf. A symmetric eigendecomposition truncated to rank $R$,
-\[ F_i \approx \sum_{r=1}^R \lambda_{ir}\, u_{ir}u_{ir}^\top , \]
-reduces this to $2\cdot169\cdot R$ per class.
+For each class $i$, a three-way showdown needs $a^\top F_i\, b$, where $a$, $b$ are the two opponents' ranges and $F_i(j,k)$ is
+the equity of $i$ against $j$ and $k$: $169^2$ operations per class. A truncated eigendecomposition gives
+\[ F_i \;\approx\; \sum_{r=1}^{R} \lambda_{r}\, u_{r}u_{r}^\top
+\qquad\Longrightarrow\qquad a^\top F_i\, b \;\approx\; \sum_{r=1}^{R}\lambda_r\,(u_r\cdot a)(u_r\cdot b), \]
+which costs $2\cdot169\cdot R$.
 \pause
 \begin{columns}[T]
 \column{0.48\textwidth}
