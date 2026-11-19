@@ -541,23 +541,25 @@ Half the memory for the same result.
 % =====================================================================================
 \begin{frame}{Rounding error in the strategy sums}
 \begin{block}{Lemma}
-Update $S\leftarrow w_tS+x_t$ in floating point, with $0\le w_t\le1$, $x_t\ge0$ and unit roundoff $u$. After $T$ updates the computed
-sum $\hat S_T$ satisfies \quad $|\hat S_T-S_T|\ \le\ 2Tu\,S_T$ \quad (up to $O(u^2)$).
+Update $S_t = w_t S_{t-1} + x_t$ in floating point ($0 \le w_t \le 1$, $x_t \ge 0$, $S_0 = 0$) with unit roundoff $u$. After $T$
+steps, the computed sum $\hat{S}_T$ satisfies
+\tightdisplays\[ |\hat{S}_T - S_T| \le 2Tu\, S_T \quad (\text{up to } O(u^2)). \]
 \end{block}
 \pause
-\textbf{Proof.} Each operation is exact up to a factor $1+\delta$ with $|\delta|\le u$. Let $e_t=\hat S_t-S_t$.
-\small
-\begin{enumerate}\setlength\itemsep{1pt}
-\item One update: \ $e_t = w_t\,e_{t-1} + \eta_t$, \ with new error $|\eta_t|\le 2u\,S_t$.
-\item Unrolling: \ $|e_T| \le \sum_t (w_{t+1}\cdots w_T)\,|\eta_t|$.
-\item Old sums only shrink, $(w_{t+1}\cdots w_T)\,S_t\le S_T$, so each term is at most $2u\,S_T$: \ $|e_T|\le 2Tu\,S_T$.\hfill$\square$
+\vspace{-7pt}\small
+\textbf{Proof.} Each operation incurs a relative factor $1 + \delta$ with $|\delta| \le u$. Let $e_t = \hat{S}_t - S_t$.
+\begin{enumerate}\setlength\itemsep{0pt}\setlength\topsep{2pt}
+\item \textbf{One step:} Two operations (multiply, then add) give $e_t = w_t e_{t-1} + \eta_t$ with $|\eta_t| \le 2u S_t$ (since
+$w_t S_{t-1} \le S_t$).
+\item \textbf{Unrolling:} Expanding $e_T$ to $e_0 = 0$ yields $|e_T| \le \sum_{t=1}^T (w_{t+1} \cdots w_T)|\eta_t|$.
+\item \textbf{Bounding:} Because $x_k \ge 0$, dropping later additions gives $(w_{t+1} \cdots w_T)S_t \le S_T$, so every term is at
+most $2u S_T$: $|e_T| \le 2Tu S_T$.\hfill$\square$
 \end{enumerate}
 
 \pause
-\normalsize
+\vspace{-6pt}
 \textbf{Consequence.} The strategy is a ratio of two such sums, so its relative error is about $4Tu$. In single precision
-\[ 4Tu \;=\; 4\cdot200\cdot6\times10^{-8} \;\approx\; 5\times10^{-5} \quad\text{after 200 iterations,} \]
-about four correct digits. A new term is lost entirely only after about $10^8$ iterations.
+\[ 4Tu \;=\; 4\cdot200\cdot6\times10^{-8} \;\approx\; 5\times10^{-5} \quad\text{after 200 iterations.} \]
 \note{
 The bound is the classical recursive-summation bound with a discount, linear in $T$ and therefore pessimistic; with rounding errors of
 random sign the typical error grows like $\sqrt T\,u$.\\[3pt]
